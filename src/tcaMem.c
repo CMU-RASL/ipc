@@ -20,6 +20,9 @@
  * REVISION HISTORY
  *
  * $Log: tcaMem.c,v $
+ * Revision 2.7  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.6  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -193,8 +196,8 @@
  * 25-Oct-90 Christopher Fedor, School of Computer Science, CMU
  * Created.
  *
- * $Revision: 2.6 $
- * $Date: 2009/01/12 15:54:57 $
+ * $Revision: 2.7 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -458,5 +461,5 @@ void x_ipcStats(FILE *stream)
 	  GET_M_GLOBAL(totalMemRequest), GET_M_GLOBAL(totalMemBytes));
   UNLOCK_M_MUTEX;
   x_ipc_dataMsgDisplayStats(stream);
-  FLUSH_IF_NEEDED(stream);
+  fflush(stream);
 }

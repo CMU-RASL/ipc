@@ -11,8 +11,8 @@
  * ABSTRACT:
  *
  * $Source: /afs/cs.cmu.edu/project/TCA/Master/ipc/src/libc.h,v $ 
- * $Revision: 2.13 $
- * $Date: 2009/01/12 15:54:56 $
+ * $Revision: 2.14 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -21,6 +21,9 @@
  *
  * REVISION HISTORY
  * $Log: libc.h,v $
+ * Revision 2.14  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.13  2009/01/12 15:54:56  reids
  * Added BSD Open Source license info
  *
@@ -588,6 +591,7 @@ extern int unlink _PARAMS((char *));
 #include <string.h>
 #include <sys/socket.h>
 #undef ALIGN
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -1320,10 +1324,6 @@ struct	sockaddr_un {
 #define BOOLEAN int		/* This gets typedef'd in the MSC includes */
 
 #endif /* _WINSOCK */
-
-#ifdef LISP
-//extern int strcasecmp(char *, char *);
-#endif /* LISP */
 
 #if defined(OS2) 
 /* #define __STDC__ 1 */	/* Already predefined in IBM Visual Age CPP */

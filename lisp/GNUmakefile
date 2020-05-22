@@ -1,7 +1,7 @@
 #############################################################################
-#       $Id: GNUmakefile,v 2.2 2009/01/12 15:54:55 reids Exp $
-# $Revision: 2.2 $
-#     $Date: 2009/01/12 15:54:55 $
+#       $Id: GNUmakefile,v 2.6 2013/08/09 14:01:25 reids Exp $
+# $Revision: 2.6 $
+#     $Date: 2013/08/09 14:01:25 $
 #   $Author: reids $
 #    $State: Exp $
 #   $Locker:  $
@@ -11,7 +11,7 @@
 # FILE:		GNUmakefile
 #		Based on TCA GNUmakefile (Richard Goodwin)
 #
-# DESCRIPTION: Makes the C-Lanaguage IPC API for NMP DS-1.
+# DESCRIPTION: Makes the LISP version of IPC.
 #
 # EXPORTS:
 #	The following targets are available as part of GNUmakefile.std:
@@ -19,27 +19,22 @@
 #		clean install
 #		lint depend
 #
-# Copyright (c) 2008, Carnegie Mellon University
-#     This software is distributed under the terms of the 
-#     Simplified BSD License (see ipc/LICENSE.TXT)
 #
 # HISTORY:
 #
 # $Log: GNUmakefile,v $
-# Revision 2.2  2009/01/12 15:54:55  reids
-# Added BSD Open Source license info
+# Revision 2.6  2013/08/09 14:01:25  reids
+# Updates for running Lisp version under Darwin
 #
-# Revision 2.1.1.1  1999/11/23 19:07:37  reids
-# Putting IPC Version 2.9.0 under local (CMU) CVS control.
+# Revision 2.5  2013/07/31 02:03:21  reids
+# Fixed the path to shared library
 #
-# Revision 1.3  1996/03/12 03:10:37  reids
-# Better support for "install"ing the fasls.
+# Revision 2.4  2013/07/24 01:43:08  reids
+# A few bugs fixed for the 3.10.0 version
 #
-# Revision 1.2  1996/03/07 03:18:36  reids
-# Don't make lib, obj, etc. subdirectories
+# Revision 2.3  2013/07/23 21:11:49  reids
+# Updated for using SWIG
 #
-# Revision 1.1  1996/03/04 22:31:28  reids
-# Makefile for LISP version of IPC
 #
 #############################################################################
 
@@ -56,8 +51,8 @@ PROJECT		= ipc
 MODULE		= ipc
 SUBDIRS		=
 DEPEND_FILE	= $(PWD)/GNUmakefile.$(THIS_MACHINE)
-#DEPEND_PREFIX	= $(ODIR)/ $(LODIR)/ $(SODIR)/ $(VODIR)/
-VERSION_FILE	= ipcPriv.h
+DEPEND_PREFIX	= $(ODIR)/ $(SODIR)/
+VERSION_FILE	= ../src/ipcPriv.h
 VERSION_PREFIX	= IPC
 
 #############################################################################
@@ -83,16 +78,22 @@ include $(DEFS_FILE)
 #    to be o.k.  Source files will never be deleted.
 ##########
 
+LISPLIB_PREFIX		= libipc_lisp
+ifeq ($(THIS_OS),wnt)
+LISPLIB_POSTFIX		= dll
+else
+LISPLIB_POSTFIX		= so
+endif
+
 # Generated files - installed
 PUBLIC_BINS_SunOS	= 
 PUBLIC_BINS		= 
-#Uncomment the next line if you want to build the lisp library.
-PUBLIC_LIBS_LISP	= 
-PUBLIC_LIBS_Solaris	= 
-PUBLIC_LIBS_SunOS	= 
-PUBLIC_LIBS_linux	= 
+
+LISPLIB			= $(LISPLIB_PREFIX).$(LISPLIB_POSTFIX)
+
 PUBLIC_LIBS_RISC	= 
-PUBLIC_LIBS		= 
+PUBLIC_LIBS	     	= $(LISPLIB)
+
 PUBLIC_LINTS		= 
 
 MODULE_LIBS		= 
@@ -106,27 +107,44 @@ PUBLIC_DOCS		=
 MODULE_INCS		= 
 MODULE_DOCS		= 
 
+# To eliminate warnings (from SWIG-generated code) about type-punning
+CFLAGS			+= -fno-strict-aliasing
+
+#install_libs		:: formatters.class primFmttrs.class IPC.class
+CFLAGS			+= -fpic -O2 \
+			    -Wno-strict-prototypes -Wno-missing-prototypes \
+			    -Wno-missing-declarations
+# Uncomment next two lines if using 32 bit Lisp
+#CFLAGS		+= -m32
+#LD_SHARED	+= -melf_i386
+
+ifndef LISP_INC_DIR
+LISP_INC_DIR		= /usr/include/lisp.h
+endif
+INC_PATH		+= -I$(LISP_INC_DIR)
+
+ifeq ($(THIS_OS),Solaris)
+INC_PATH		+= -I/usr/local/include
+endif
+INC_PATH		+= -I../src
+
 INCS			= $(MODULE_INCS) $(PUBLIC_INCS)
 
 # Generated files - not installed
 PRIVS	= 
 
-IPCOBJS = ipc.fasl ipcForeignCalls.fasl
-TCAOBJS = formatters.fasl primFmttrs.fasl
-OBJS = $(IPCOBJS) $(TCAOBJS)
+_OBJS = IPC_wrap.o
+
+OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 
 # Source files - not installed
 
-IPC_SRCS            = ipc-system.lisp ipc-package.lisp ipcForeignCalls.lisp
-
-TCA_SRCS       = formatters.lisp primFmttrs.lisp \
-		 lwMacros.lisp mclMacros.lisp winMacros.lisp
-
-SRCS            = $(IPC_SRCS) $(TCA_SRCS)
+SRCS            = IPC.i formatters.lisp primFmttrs.lisp ipcLisp.lisp \
+		  ipcLisp.h ipcLisp.c
 
 PRIVATE_INCS	= 
 
-MISC	= GNUmakefile README INSTALL ipc-load.lisp ipc-compile.lisp
+MISC	= GNUmakefile README
 
 # All source files
 SRCS_ALL	= $(INCS) $(PRIVATE_INCS) $(SRCS) $(MANS) $(DOCS) $(MISC)
@@ -141,7 +159,8 @@ DELETES		= core $(DEPEND_FILE) \
 		  $(MODULE_LIBS) $(MODULE_LINTS) $(PRIVS) $(OBJS) make.state \
 		  $(wildcard .nse_dep*) $(wildcard *.CKP) $(wildcard \#*\#) \
 		  $(wildcard *~) $(wildcard .*~) $(wildcard *.CKP)\
-	          $(wildcard *.BAK) $(wildcard .*.BAK)
+	          $(wildcard *.BAK) $(wildcard .*.BAK) *.class $(GEN_HEADERS) \
+		  IPC.lisp IPC_wrap.c *.fasl
 
 # Files never to be removed, even if Make encounters an error
 .PRECIOUS: $(SRCS_ALL) $(SUBDIRS)
@@ -150,22 +169,66 @@ DELETES		= core $(DEPEND_FILE) \
 # Default Target
 ##########
 
-all:: privs
+all:: srcs libs bins privs
 
 ##########
 # User Defined Targets
 ##########
 
-LISP_BIN = /usr/misc/.allegro/bin/cl
+# Define rules for all files listed in BINS, LIBS, and LINTS in this section.
+# Example executable, object, library, and combined objects are shown below:
+#
+#  $(BDIR)/sample: file1.o file2.o $(LIBDEP)
+#	$(LINK.c) -o $@ file1.o file2.o $(LIBRARIES)
+#
+#  $(ODIR)/alternateName.o: file1.c
+#	$(COMPILE.c) -o $@ file1.c
+#
+#  $(LDIR)/libsample.a: file1.o file2.o
+#	-$(RM) $@
+#	$(AR) $(ARFLAGS) $@ file1.o file2.o
+#	$(RANLIB) $@
+#
+#  $(ODIR)/combined.o: $(ODIR)/part1.o $(ODIR)/part2.o
+#	$(LD) -r -o $@ $(ODIR)/part1.o $(ODIR)/part2.o; chmod a-x $@
 
-FASLS = fasl
+INC_PATH += -I/usr/local/acl/acl90-smp/misc
 
-fasl: $(SRCS)
-	$(LISP_BIN) -e "(progn (load \"ipc-compile\") (exit))"
+IPC_wrap.c : IPC.i ../src/ipcFFI.h ../src/ipcFFI.c \
+	   ipcLisp.h ipcLisp.c ipcLisp.lisp
+	swig -allegrocl $(INC_PATH) -outcurrentdir \
+		-DLIB_DIR='"$(PWD)/$(PUBLIC_LIB_DIR)"' \
+		-DLISP_DIR='"$(PWD)"' -o $@ $<
+	mv -f IPC.cl IPC.lisp
 
-install:: fasl
+ifeq ($(THIS_OS),wnt)
+$(LDIR)/$(LISPLIB): $(OBJS)
+	$(RM) $@
+	$(LD_SHARED) -o $@ $(OBJS) $(LIB_PATH) -lipc
+else
+ifeq ($(THIS_OS),Darwin)
+$(LDIR)/$(LISPLIB): $(OBJS)
+	$(RM) $@
+	cd ../src; $(MAKE) MAKE_SHARED_LIBS=1 USE_LISP=1 install; cd ../lisp
+	$(LD_SHARED) -flat_namespace -undefined warning -o $@ $(OBJS) \
+	  $(PWD)/$(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR)
+else
+$(LDIR)/$(LISPLIB): $(OBJS)
+	$(RM) $@
+	cd ../src; $(MAKE) MAKE_SHARED_LIBS=1 USE_LISP=1 install; cd ../lisp
+	$(LD_SHARED) -o $@ $(OBJS) \
+	  $(PWD)/$(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR)
+endif
+endif
 
-install_bins:: fasl
+# this dependency is used to update the version information.
+# $(ODIR)/ipc.o: $(SRCS_ALL)
+
+# $(LODIR)/ipc.o: $(SRCS_ALL)
+
+#
+# Targets for building a release
+#
 
 ##########
 # Include standard target definitions and RCS rules

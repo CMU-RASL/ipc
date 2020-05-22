@@ -1,7 +1,7 @@
 #############################################################################
-#       $Id: formatters.py,v 1.1 2011/08/16 16:00:36 reids Exp $
-# $Revision: 1.1 $
-#     $Date: 2011/08/16 16:00:36 $
+#       $Id: formatters.py,v 1.3 2013/07/23 21:12:52 reids Exp $
+# $Revision: 1.3 $
+#     $Date: 2013/07/23 21:12:52 $
 #   $Author: reids $
 #    $State: Exp $
 #   $Locker:  $
@@ -18,6 +18,12 @@
 #     Simplified BSD License (see ipc/LICENSE.TXT)
 #
 # $Log: formatters.py,v $
+# Revision 1.3  2013/07/23 21:12:52  reids
+# Made consistent with other language ports
+#
+# Revision 1.2  2012/02/27 16:55:46  reids
+# Fixed some problems with python and significantly improved transfer of arrays to/from python
+#
 # Revision 1.1  2011/08/16 16:00:36  reids
 # Adding Python interface to IPC
 #
@@ -27,6 +33,7 @@ import primFmttrs
 import _IPC
 from _IPC import *
 from types import InstanceType
+import IPC # to get Raise, for some reason from IPC import Raise doesn't work
 
 PrimitiveFMT  = 0
 LengthFMT     = 1
@@ -104,15 +111,23 @@ def arrayTransferToBuffer (array, buffer, dim, max, isSimple,
     len = varArrayDimSize(dim, formatArray, dataStruct)
   else :
     len = formatFormatArrayItemInt(formatArray, dim)
-  for i in range(len) :
+
+  if (isSimple and dim == max) :
+    primFmttrs.EncodeArray(formatPrimitiveProc(arrayFormat), array, len, buffer)
+    return
+  if (isSimple) : primProc = primFmttrs.pickTrans(formatPrimitiveProc(arrayFormat))
+  i = 0
+  while (i < len) :
     if (dim != max) :
       arrayTransferToBuffer(array[i], buffer, dim+1, max, isSimple,
                             formatArray, arrayFormat, dataStruct, isVarArray)
     elif (isSimple) :
-      primFmttrs.EncodeElement(formatPrimitiveProc(arrayFormat),
-                               array, i, buffer)
+      primProc.EncodeElement(array, i, buffer)
+    elif (formatType(arrayFormat) == EnumFMT) :
+      primFmttrs.EncodeElement(primFmttrs.ENUM_FMT, array, i, buffer);
     else :
       transferToBuffer(arrayFormat, array[i], 0, buffer, 0, True)
+    i = i + 1
 
 # dataStruct is the parent structure
 def arrayTransferToDataStructure (array, buffer, dim, max, len, isSimple,
@@ -125,18 +140,25 @@ def arrayTransferToDataStructure (array, buffer, dim, max, len, isSimple,
     else :
       nextLen = formatFormatArrayItemInt(formatArray, dim+1)
 
-  for i in range(len) :
+  if (isSimple and dim == max) :
+    primFmttrs.DecodeArray(formatPrimitiveProc(arrayFormat), array, len, buffer)
+    return
+  if (isSimple) : primProc = primFmttrs.pickTrans(formatPrimitiveProc(arrayFormat))
+  i = 0
+  while (i < len) :
     if (dim != max) :
       array[i] = validateArrayObject(array[i], nextLen, array, -1)
       arrayTransferToDataStructure(array[i], buffer, dim+1, max, nextLen,
                                    isSimple, formatArray, arrayFormat,
                                    dataStruct, dStart, isVarArray, oclass)
     elif (isSimple) :
-      primFmttrs.DecodeElement(formatPrimitiveProc(arrayFormat), 
-                               array, i, buffer)
+      primProc.DecodeElement(array, i, buffer)
+    elif (formatType(arrayFormat) == EnumFMT) :
+	primFmttrs.DecodeElement(primFmttrs.ENUM_FMT, array, i, buffer);
     else :
       array[i] = validateObject(array[i], dataStruct, dStart, oclass)
       transferToDataStructure(arrayFormat, array[i], 0, buffer, 0, True)
+    i = i + 1
 
 def validateObject (object, parentObject, index, oclass=None) :
   if (object is None) :
@@ -148,13 +170,19 @@ def validateObject (object, parentObject, index, oclass=None) :
 
   return object
 
+def invalidStructFormat(oclass, dclass) :
+  if (oclass != None) : oclass = oclass.__name__;
+  if (dclass != None) : dclass = dclass.__name__;
+  return "ERROR: Data structure does not match format -- Should be %s; is %s"%\
+         (dclass, oclass)
+
 def invalidArrayFormat(object, index) :
-  return "Data structure %s does not match format -- field %s needs to be an array" % \
+  return "ERROR: Data structure %s does not match format -- field %s needs to be an array" % \
          (object, primFmttrs.getNthFieldName(object, index))
 
 def validateArrayObject (arrayObject, dim, object, index) :
   if (not (arrayObject is None or isinstance(arrayObject, (list, tuple)))) :
-    raise invalidArrayFormat(object, index)
+    IPC.Raise(invalidArrayFormat(object, index))
   elif (arrayObject is None or len(arrayObject) != dim) :
     arrayObject = [None]*dim;
   return arrayObject;
@@ -172,7 +200,7 @@ def bufferSize1 (format, dataStruct, dStart, parentFormat, isTopLevelStruct) :
   ftype = _IPC.formatType(format)
   
   if (ftype == LengthFMT) :
-    raise "Python version of IPC can only use explicit formats"
+    IPC.Raise("Python version of IPC can only use explicit formats")
   elif (ftype == PrimitiveFMT) :
     primType = _IPC.formatPrimitiveProc(format)
     bufSize = bufSize + primFmttrs.ELength(primType, dataStruct, dStart)
@@ -203,7 +231,7 @@ def bufferSize1 (format, dataStruct, dStart, parentFormat, isTopLevelStruct) :
     else :
       arrayObject = primFmttrs.getObjectField(dataStruct, dStart)
     if (not isinstance(arrayObject, (tuple, list))) :
-      raise invalidArrayFormat(dataStruct, dStart)
+      IPC.Raise(invalidArrayFormat(dataStruct, dStart))
     elif (isSimpleType(nextFormat)) :
       bufSize = bufSize + (bufferSize1(nextFormat, arrayObject, 0, 0, False) *
                            fixedArrayNumElements(formatArray))
@@ -222,7 +250,7 @@ def bufferSize1 (format, dataStruct, dStart, parentFormat, isTopLevelStruct) :
     # For the size of the array
     bufSize = bufSize + primFmttrs.ELength(primFmttrs.INT_FMT, None, 0)
     if (not isinstance(arrayObject, (tuple, list))) :
-      raise invalidArrayFormat(dataStruct, dStart)
+      IPC.Raise(invalidArrayFormat(dataStruct, dStart))
     elif (isSimpleType(nextFormat)) :
       bufSize = bufSize + (bufferSize1(nextFormat, arrayObject, 0, 0, False) *
                            varArrayNumElements(formatArray, dataStruct))
@@ -238,7 +266,7 @@ def bufferSize1 (format, dataStruct, dStart, parentFormat, isTopLevelStruct) :
   elif (ftype == EnumFMT) :
     bufSize = bufSize + primFmttrs.ELength(primFmttrs.INT_FMT, None, 0);
   else :
-    raise "Unhandled format: %s" % ftype
+    IPC.Raise("Unhandled format: %s" % ftype)
 
   return bufSize;
 
@@ -251,7 +279,7 @@ def transferToBuffer (format, dataStruct, dStart, buffer, parentFormat,
   ftype = _IPC.formatType(format)
 
   if (ftype == LengthFMT) :
-    raise "Python version of IPC can only use explicit formats"
+    IPC.Raise("Python version of IPC can only use explicit formats")
   elif (ftype == PrimitiveFMT) :
     if (isTopLevelStruct) :
       object = IPCdata()
@@ -284,7 +312,7 @@ def transferToBuffer (format, dataStruct, dStart, buffer, parentFormat,
     if (isTopLevelStruct) : arrayObject = dataStruct
     else : arrayObject = primFmttrs.getObjectField(dataStruct, dStart)
     if (not isinstance(arrayObject, (tuple, list))) :
-      raise invalidArrayFormat(dataStruct, dStart)
+      IPC.Raise(invalidArrayFormat(dataStruct, dStart))
     else :
       arrayTransferToBuffer(arrayObject, buffer, 2, 
  			    _IPC.formatFormatArrayMax(formatArray)-1,
@@ -299,7 +327,7 @@ def transferToBuffer (format, dataStruct, dStart, buffer, parentFormat,
     _IPC.formatPutInt(buffer, varArrayNumElements(formatArray,
  							dataStruct))
     if (not isinstance(arrayObject, (tuple, list))) :
-      raise invalidArrayFormat(dataStruct, dStart)
+      IPC.Raise(invalidArrayFormat(dataStruct, dStart))
     else :
       arrayTransferToBuffer(arrayObject, buffer, 2, 
  			    _IPC.formatFormatArrayMax(formatArray)-1,
@@ -311,17 +339,21 @@ def transferToBuffer (format, dataStruct, dStart, buffer, parentFormat,
   elif (ftype == EnumFMT) :
     primFmttrs.Encode(primFmttrs.INT_FMT, dataStruct, dStart, buffer);
   else :
-    raise "Unhandled format: %s" % ftype
+    IPC.Raise("Unhandled format: %s" % ftype)
 
 def transferToDataStructure (format, dataStruct, dStart, buffer, parentFormat,
                              isTopLevelStruct, oclass=None) :
   ftype = _IPC.formatType(format)
 
   if (ftype == LengthFMT) :
-    raise "Python version of IPC can only use explicit formats"
+    IPC.Raise("Python version of IPC can only use explicit formats")
   elif (ftype == PrimitiveFMT) :
+    try: dataStruct.__dict__ # Is this a settable object
+    except AttributeError:
+      IPC.Raise(invalidStructFormat(type(dataStruct),
+                                    primFmttrs.PrimType(_IPC.formatPrimitiveProc(format))))
     primFmttrs.Decode(_IPC.formatPrimitiveProc(format), dataStruct, dStart,
- 		      buffer)
+                      buffer)
   elif (ftype == PointerFMT) :
     theChar = _IPC.formatGetChar(buffer)
     if (theChar == '\0') :
@@ -370,10 +402,10 @@ def transferToDataStructure (format, dataStruct, dStart, buffer, parentFormat,
     if (numDims > 1) : size = varArrayDimSize(2, formatArray, dataStruct)
 
     if (not feasibleToDecodeVarArray(size, formatArray, dStart)) :
-      raise "Python version of IPC cannot decode " + \
-	    "multi-dimensional variable length arrays unless " + \
-	    "the size variables appear BEFORE the array " + \
-	    "in the enclosing structure"
+      IPC.Raise("Python version of IPC cannot decode " + \
+                "multi-dimensional variable length arrays unless " + \
+                "the size variables appear BEFORE the array " + \
+                "in the enclosing structure")
     elif (isTopLevelStruct) :
       arrayObject = dataStruct
     else :
@@ -390,7 +422,7 @@ def transferToDataStructure (format, dataStruct, dStart, buffer, parentFormat,
   elif (ftype == EnumFMT) :
     primFmttrs.Decode(primFmttrs.INT_FMT, dataStruct, dStart, buffer)
   else :
-    raise "Unhandled format: %s" % ftype
+    IPC.Raise("Unhandled format: %s" % ftype)
 
 def encodeData (formatter, object, buffer) :
   transferToBuffer(formatter, object, 0, buffer, 0, True)
@@ -412,8 +444,8 @@ def marshall (formatter, object, varcontent) :
       buffer = createBuffer(varcontent.content)
       encodeData(formatter, object, buffer)
       if (bufferLength(buffer) != varcontent.length) :
-        raise "Mismatch between buffer size (%d) and encoded data (%d)" % \
-              (varcontent.length, bufferLength(buffer))
+        IPC.Raise("Mismatch between buffer size (%d) and encoded data (%d)" % \
+                  (varcontent.length, bufferLength(buffer)))
       freeBuffer(buffer)
     return _IPC.IPC_OK
 
@@ -433,8 +465,8 @@ def unmarshall (formatter, byteArray, object=None, oclass=None) :
       else : theObject = oclass()
     else :
       if (not oclass is None and not isinstance(object, oclass)) :
-        raise "unmarshall: Object %s and class %s do not match" % \
-              (object, oclass)
+        IPC.Raise("unmarshall: Object %s and class %s do not match" % \
+                  (object, oclass))
       theObject = object
     decodeData(formatter, buffer, theObject, oclass)
     if (needEnclosingObject) : theObject = theObject._f0
@@ -446,81 +478,3 @@ def unmarshall (formatter, byteArray, object=None, oclass=None) :
 def createFixedArray(arrayClass, formatter) :
   size = _IPC.formatFormatArrayItemInt(_IPC.formatFormatArray(formatter), 2);
   return [None] * size
-
-#   public static class IPCPrim {
-#     public Object coerce () { return null; }
-#     public String toString() { return "IPCPrim"; }
-#   }
-
-#   public static class IPCChar extends IPCPrim {
-#     public IPCChar () {}
-#     public IPCChar (char theChar) { value = theChar; }
-#     public Object coerce () { return this; }
-#     public String toString() { return new String() + value; }
-#     public char value;
-#   }
-
-#   public static class IPCBoolean extends IPCPrim {
-#     public IPCBoolean () {}
-#     public IPCBoolean (boolean theBoolean) { value = theBoolean; }
-#     public Object coerce () { return new Boolean(value); }
-#     public String toString() { return (value ? "true" : "false"); }
-#     public boolean value;
-#   }
-
-#   public static class IPCByte extends IPCPrim {
-#     public IPCByte () {}
-#     public IPCByte (byte theByte) { value = theByte; }
-#     public Object coerce () { return new Byte(value); }
-#     public String toString() { return Byte.toString(value); }
-#     public byte value;
-#   }
-
-#   public static class IPCShort extends IPCPrim {
-#     public IPCShort () {}
-#     public IPCShort (short theShort) { value = theShort; }
-#     public Object coerce () { return new Short(value); }
-#     public String toString() { return Short.toString(value); }
-#     public short value;
-#   }
-
-#   public static class IPCInteger extends IPCPrim {
-#     public IPCInteger () {}
-#     public IPCInteger (int theInt) { value = theInt; }
-#     public Object coerce () { return new Integer(value); }
-#     public String toString() { return Integer.toString(value); }
-#     public int value;
-#   }
-
-#   public static class IPCLong extends IPCPrim {
-#     public IPCLong () {}
-#     public IPCLong (long theLong) { value = theLong; }
-#     public Object coerce () { return new Long(value); }
-#     public String toString() { return Long.toString(value); }
-#     public long value;
-#   }
-
-#   public static class IPCFloat extends IPCPrim {
-#     public IPCFloat () {}
-#     public IPCFloat (float theFloat) { value = theFloat; }
-#     public Object coerce () { return new Float(value); }
-#     public String toString() { return Float.toString(value); }
-#     public float value;
-#   }
-
-#   public static class IPCDouble extends IPCPrim {
-#     public IPCDouble () {}
-#     public IPCDouble (double theDouble) { value = theDouble; }
-#     public Object coerce () { return new Double(value); }
-#     public String toString() { return Double.toString(value); }
-#     public double value;
-#   }
-
-#   public static class IPCString extends IPCPrim {
-#     public IPCString () {}
-#     public IPCString (String theString) { value = theString; }
-#     public Object coerce () { return value; }
-#     public String toString() { return value; }
-#     public String value;
-#   }
-# }

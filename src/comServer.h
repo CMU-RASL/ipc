@@ -14,8 +14,8 @@
  * Communication Routines - Central Server
  *
  * $Source: /afs/cs.cmu.edu/project/TCA/Master/ipc/src/comServer.h,v $ 
- * $Revision: 2.3 $
- * $Date: 2009/01/12 15:54:56 $
+ * $Revision: 2.4 $
+ * $Date: 2013/11/22 16:57:29 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -25,6 +25,17 @@
  * REVISION HISTORY:
  *
  * $Log: comServer.h,v $
+ * Revision 2.4  2013/11/22 16:57:29  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
  * Revision 2.3  2009/01/12 15:54:56  reids
  * Added BSD Open Source license info
  *
@@ -194,23 +205,23 @@ centralRegisterMessage(name, InformClass, format, (const char *)NULL)
      
 #define centralRegisterGoal(name, format, hndProc) \
 {centralRegisterGoalMessage(name, format); \
-   centralRegisterHandler(name, name, proc)}
+   centralRegisterHandler(name, proc)}
 
 #define centralRegisterCommand(name, format, hndProc) \
 {centralRegisterCommandMessage(name, format); \
-   centralRegisterHandler(name, name, hndProc)}
+   centralRegisterHandler(name, hndProc)}
 
 #define centralRegisterInform(name, format, hndProc) \
 {centralRegisterInformMessage(name, format); \
-   centralRegisterHandler(name, name, hndProc)}
+   centralRegisterHandler(name, hndProc)}
 
 #define centralRegisterQuery(name, format, reply, hndProc) \
 {centralRegisterQueryMessage(name, format, reply); \
-   centralRegisterHandler(name, name, hndProc)}
+   centralRegisterHandler(name, hndProc)}
 
 #define centralRegisterException(name, format, hndProc) \
 {centralRegisterExceptionMessage(name, format); \
-   centralRegisterHandler(name, name, hndProc)}
+   centralRegisterHandler(name, hndProc)}
 
 typedef struct {
   int sd;
@@ -232,14 +243,16 @@ void centralRegisterMessage(const char *name, X_IPC_MSG_CLASS_TYPE msg_class,
 void centralRegisterNamedFormatter(const char *formatterName, 
 				   const char *formatString);
 
-void _centralRegisterHandler(const char *msgName, 
-			     const char *hndName,
-			     X_IPC_HND_FN hndProc);
+void _centralRegisterHandler(const char *msgName, const char *hndName,
+			     X_IPC_HND_FN hndProc, BOOLEAN autoUnmarshall);
 
 void centralRegisterLengthFormatter(char *formatterName, int32 length);
 
-#define centralRegisterHandler(msgName, hndName, hndProc) \
-_centralRegisterHandler(msgName, hndName, (X_IPC_HND_FN) hndProc);
+#define centralRegisterHandler(msgName, hndProc) \
+  _centralRegisterHandler(msgName, msgName, (X_IPC_HND_FN) hndProc, TRUE);
+
+#define centralRegisterHandlerRaw(msgName, hndProc) \
+  _centralRegisterHandler(msgName, msgName, (X_IPC_HND_FN) hndProc, FALSE);
 
 void removeConnection(MODULE_PTR module);
 void moduleClean(MODULE_PTR module);

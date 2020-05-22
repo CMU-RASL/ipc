@@ -15,8 +15,8 @@
  * Receive message provides the main thread of flow and control in x_ipc.
  *
  * $Source: /afs/cs.cmu.edu/project/TCA/Master/ipc/src/recvMsg.c,v $ 
- * $Revision: 2.7 $
- * $Date: 2009/01/12 15:54:57 $
+ * $Revision: 2.9 $
+ * $Date: 2013/11/22 16:57:30 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -26,6 +26,20 @@
  * REVISION HISTORY:
  *
  * $Log: recvMsg.c,v $
+ * Revision 2.9  2013/11/22 16:57:30  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
+ * Revision 2.8  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.7  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -408,9 +422,9 @@ static DISPATCH_HND_PTR chooseMsgHandler(MSG_PTR msg)
     hnd->msgList = NULL;
     hnd->resource = resourceCreate(0, 0, msg->msgData->name, 1);
     hnd->resource->capacity = 0;
-    hnd->hndLanguage = C_LANGUAGE;
 #ifdef NMP_IPC
     hnd->clientData = NO_CLIENT_DATA;
+    hnd->autoUnmarshall = TRUE;
 #endif
     
     x_ipc_listInsertItem((char *)hnd, msg->hndList);

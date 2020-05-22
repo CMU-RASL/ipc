@@ -21,6 +21,9 @@
  * REVISION HISTORY
  *
  * $Log: datamsg.c,v $
+ * Revision 2.8  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.7  2010/12/17 19:20:23  reids
  * Split IO mutex into separate read and write mutexes, to help minimize
  *   probability of deadlock when reading/writing very big messages.
@@ -415,8 +418,8 @@
  * 26-Apr-89 Christopher Fedor, School of Computer Science, CMU
  * Need to insure that central will not block on socket reads and writes. 
  *
- * $Revision: 2.7 $
- * $Date: 2010/12/17 19:20:23 $
+ * $Revision: 2.8 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -1012,7 +1015,7 @@ X_IPC_RETURN_STATUS_TYPE x_ipc_dataMsgSend(int sd, DATA_MSG_PTR dataMsg)
   X_IPC_RETURN_STATUS_TYPE res;
   char *sendInfo;
   struct iovec *tmpVec;
-  
+
   //  LOCK_IO_MUTEX;
   headerAmount = HEADER_SIZE();
   classAmount = dataMsg->classTotal;
@@ -1085,10 +1088,6 @@ DATA_MSG_PTR x_ipc_dataMsgCreate(int32 parentRef, int32 intent, int32 classId,
 				 CONST_FORMAT_PTR classFormat,
 				 const void *classData)
 {
-#ifdef LISP
-  BUFFER_TYPE buffer;
-  char *lispDataFlag;
-#endif /* LISP */
   DATA_MSG_PTR dataMsg;
   int32 classTotal, msgTotal;
   
@@ -1096,14 +1095,6 @@ DATA_MSG_PTR x_ipc_dataMsgCreate(int32 parentRef, int32 intent, int32 classId,
   
   if (msgData && msgFormat) {
     if (msgFormat->type == BadFormatFMT) return NULL;
-#ifdef LISP
-    LOCK_M_MUTEX;
-    if (msgData == LISP_DATA_FLAG()) {
-      (*(GET_M_GLOBAL(lispBufferSizeGlobal)))(&msgTotal, msgFormat);
-      UNLOCK_M_MUTEX;
-    } else
-      UNLOCK_M_MUTEX;
-#endif /* LISP */
       msgTotal = x_ipc_bufferSize(msgFormat, msgData);
   }
   
@@ -1128,25 +1119,7 @@ DATA_MSG_PTR x_ipc_dataMsgCreate(int32 parentRef, int32 intent, int32 classId,
   dataMsg->dispatchRef = dispatchRef;
   dataMsg->msgRef = msgRef;
   
-#ifdef LISP
-  LOCK_M_MUTEX;
-  lispDataFlag = LISP_DATA_FLAG();
-  UNLOCK_M_MUTEX;
-  if ((msgTotal != 0) && (msgData == lispDataFlag)) {
-    dataMsg->msgData = (char *)x_ipcMalloc(msgTotal);
-    buffer.buffer = dataMsg->msgData;
-    buffer.bstart = 0;
-    LOCK_M_MUTEX;
-    (*(GET_M_GLOBAL(lispEncodeMsgGlobal)))(msgFormat, &buffer);
-    UNLOCK_M_MUTEX;
-    dataMsg->vec = x_ipc_createVectorization(msgFormat,
-					     (char *)msgData,dataMsg->msgData,
-					     msgTotal);
-  } else
-#endif
-    { 
-      x_ipc_encodeMsgData(msgFormat, msgData, dataMsg, 0);
-    }
+  x_ipc_encodeMsgData(msgFormat, msgData, dataMsg, 0);
   
   if (classTotal) {
     dataMsg->classData = (char *)dataMsg + sizeof(DATA_MSG_TYPE);
@@ -1172,11 +1145,7 @@ void x_ipc_encodeMsgData(CONST_FORMAT_PTR Format, const void *DataStruct,
   if (Format == NULL) {
     dataMsg->msgData = NULL;
   } else {
-    BOOLEAN isLisp;
-    LOCK_M_MUTEX;
-    isLisp = IS_LISP_MODULE();
-    UNLOCK_M_MUTEX;
-    if (!isLisp && x_ipc_sameFixedSizeDataBuffer(Format)) {
+    if (x_ipc_sameFixedSizeDataBuffer(Format)) {
       dataMsg->msgData = (char *)DataStruct;
     } else {
       dataMsg->msgData = (char *)x_ipcMalloc((unsigned)dataMsg->msgTotal);
@@ -1195,15 +1164,6 @@ void *x_ipc_decodeMsgData(CONST_FORMAT_PTR Format,  DATA_MSG_PTR dataMsg,
 		    BOOLEAN keepData)
 {
   char *DataStruct=NULL;
-#if (!defined(LISP))
-  if (x_ipc_sameFixedSizeDataBuffer(Format)) {
-    dataMsg->dataStruct = dataMsg->msgData;
-    DataStruct = dataMsg->msgData;
-    if (dataMsg->dataByteOrder == BYTE_ORDER)
-      /* This is now a no op */
-      return ((void *)dataMsg->msgData);
-  }
-#endif
   /* Have to keep it anyway, probably for sending after printing.*/
   if (keepData) {
     DataStruct = NULL;
@@ -1420,7 +1380,7 @@ void x_ipc_dataMsgDisplayStats(FILE *stream)
 	  GET_M_GLOBAL(sizeDM));
 #endif  
   UNLOCK_M_MUTEX;
-  FLUSH_IF_NEEDED(stream);
+  fflush(stream);
 }
 
 

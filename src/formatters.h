@@ -19,6 +19,9 @@
  * REVISION HISTORY
  *
  * $Log: formatters.h,v $
+ * Revision 2.13  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.12  2009/09/04 19:12:57  reids
  * Port for ARM
  *
@@ -304,8 +307,8 @@
  * Revision 1.2  1993/05/19  17:23:48  fedor
  * Added Logging.
  *
- * $Revision: 2.12 $
- * $Date: 2009/09/04 19:12:57 $
+ * $Revision: 2.13 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -616,7 +619,8 @@ typedef enum
 #define ALIGN ALIGN_LONGEST
 #elif defined(pmax) || defined(alpha) || defined(__alpha) || defined(__alpha__)
 #define ALIGN ALIGN_LONGEST
-#elif _MSC_VER == 1200  /* JSM Microsoft VC++ Version 6.0 aligns on 8-byte boundaries */
+#elif _MSC_VER >= 1200  /* JSM Microsoft VC++ Version 6.0, and later,
+			   aligns on 8-byte boundaries */
 #define ALIGN ALIGN_LONGEST
 #elif defined(i386) || defined(__TURBOC__) || defined(OS2) || defined(_WIN95_MSC_) || defined(WIN32)
 #define ALIGN ALIGN_INT
@@ -625,10 +629,10 @@ typedef enum
 /* Note, the next line is only valid for gcc, but will only be evaluated 
  * if the machine type is unknown.
  */
-#elif #machine (sparc)
-#define ALIGN ALIGN_LONGEST
-#elif #machine (arm)
-#define ALIGN ALIGN_ARM
+//#elif #machine (sparc)
+//#define ALIGN ALIGN_LONGEST
+//#elif #machine (arm)
+//#define ALIGN ALIGN_ARM
 #else 
 #undef ALIGN
 #endif

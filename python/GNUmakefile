@@ -1,7 +1,7 @@
 #############################################################################
-#       $Id: GNUmakefile,v 1.2 2011/08/17 15:58:06 reids Exp $
-# $Revision: 1.2 $
-#     $Date: 2011/08/17 15:58:06 $
+#       $Id: GNUmakefile,v 1.7 2013/09/22 21:19:55 reids Exp $
+# $Revision: 1.7 $
+#     $Date: 2013/09/22 21:19:55 $
 #   $Author: reids $
 #    $State: Exp $
 #   $Locker:  $
@@ -26,6 +26,21 @@
 # HISTORY:
 #
 # $Log: GNUmakefile,v $
+# Revision 1.7  2013/09/22 21:19:55  reids
+# Updated compilation for python
+#
+# Revision 1.6  2013/07/31 02:03:21  reids
+# Fixed the path to shared library
+#
+# Revision 1.5  2013/07/23 21:13:12  reids
+# Updated for using SWIG
+#
+# Revision 1.4  2012/02/27 17:06:29  reids
+# Fixed library linking
+#
+# Revision 1.3  2012/02/27 16:55:46  reids
+# Fixed some problems with python and significantly improved transfer of arrays to/from python
+#
 # Revision 1.2  2011/08/17 15:58:06  reids
 # Updated makefiles to include new Python stuff for tar'ing up
 #
@@ -106,8 +121,8 @@ MODULE_DOCS		=
 # To eliminate warnings (from SWIG-generated code) about type-punning
 CFLAGS			+= -fno-strict-aliasing
 
-#install_libs		:: formatters.class primFmttrs.class IPC.class
-CFLAGS			+= -fPIC -O2
+CFLAGS			+= -O2
+
 ifndef PYTHON_INC_DIR
 PYTHON_INC_DIR		= /usr/include/python2.5
 endif
@@ -116,13 +131,8 @@ PYTHON_LIB_DIR		= /usr/lib/python2.5
 endif
 INC_PATH		+= -I$(PYTHON_INC_DIR)
 
-# Needed for jni_md.h
-ifeq ($(THIS_OS),Linux)
-#INC_PATH		+= -I/usr/java/jdk1.3.1/include/linux
-else
 ifeq ($(THIS_OS),Solaris)
 INC_PATH		+= -I/usr/local/include
-endif
 endif
 INC_PATH		+= -I../src
 
@@ -137,7 +147,7 @@ OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 
 # Source files - not installed
 
-SRCS            = IPC.i formatters.py primFmttrs.py ipcPython.py test.py \
+SRCS            = IPC.i formatters.py primFmttrs.py ipcPython.py \
 		  ipcPython.h ipcPython.c
 
 PRIVATE_INCS	= 
@@ -204,11 +214,19 @@ $(LDIR)/$(PYTHONLIB): $(OBJS)
 	$(LD_SHARED) -o $@ $(OBJS) -L$(PYTHON_LIB_DIR)/config -lpython2.5 \
 	  $(LIB_PATH) -lipc
 else
+ifeq ($(THIS_OS),Darwin)
+$(LDIR)/$(PYTHONLIB): $(OBJS)
+	$(RM) $@
+	cd ../src; $(MAKE) MAKE_SHARED_LIBS=1 install; cd ../python
+	$(LD_SHARED) -o $@ $(OBJS) -L$(PYTHON_LIB_DIR)/config -lpython2.6 \
+	  $(PWD)/$(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR)
+else
 $(LDIR)/$(PYTHONLIB): $(OBJS)
 	$(RM) $@
 	cd ../src; $(MAKE) MAKE_SHARED_LIBS=1 install; cd ../python
 	$(LD_SHARED) -o $@ $(OBJS) \
-	  $(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR)
+	  $(PWD)/$(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR)
+endif
 endif
 
 # this dependency is used to update the version information.

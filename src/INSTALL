@@ -6,13 +6,8 @@ Making IPC for Unix is quite simple:
 gmake depend
 gmake install
 
-To make the IPC libraries useable by Allegro Common Lisp:
-1) Find out where Allegro is kept on your machine.  Edit the file
-   src/GNUmakefile and change the variable LISP_INC_DIR to reflect where the
-   LISP include files are found in your environment.
-
-2) Compile using "gmake USE_LISP=1 install", *or* edit src/GNUmakefile and
-   uncomment the line containing USE_LISP.
+To make the IPC libraries usable by Lisp, Java, or Python, see
+the README files in the ../lisp, ../java, and ../python directories
 
 For vxworks:
   gmake VX=<target> install

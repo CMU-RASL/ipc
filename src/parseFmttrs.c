@@ -19,6 +19,20 @@
  * REVISION HISTORY
  *
  * $Log: parseFmttrs.c,v $
+ * Revision 2.9  2013/11/22 16:57:30  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
+ * Revision 2.8  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.7  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -207,8 +221,8 @@
  * 10-Feb-89 Reid Simmons, School of Computer Science, CMU
  * Created.
  *
- * $Revision: 2.7 $
- * $Date: 2009/01/12 15:54:57 $
+ * $Revision: 2.9 $
+ * $Date: 2013/11/22 16:57:30 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -423,12 +437,6 @@ static FORMAT_PTR Enum_Format(Format_Parse_Ptr parser, BOOLEAN *error)
 	return NULL;
       } else {
 	Form = new_n_formatter(Token->value.str);
-	/* More efficient for Lisp if all enum format names are upper case */
-	LOCK_M_MUTEX;
-	if (IS_LISP_MODULE()) {
-	  upcase(Form->formatter.name);
-	}
-	UNLOCK_M_MUTEX;
 	x_ipc_listInsertItem((char *)Form, format_list);
 	num_formats++;
       }
@@ -616,27 +624,22 @@ static FORMAT_PTR Named_Format(Format_Parse_Ptr parser, TokenPtr Token)
   NAMED_FORMAT_PTR namedFormat;
   FORMAT_PTR format;
   
-  if (parser->formatStack == NULL) {
-    parser->formatStack = x_ipc_strListCreate();
-  }
-  
-  if (x_ipc_strListMemberItem(Token->value.str, parser->formatStack)) {
+  if (parser->formatStack &&
+      x_ipc_strListMemberItem(Token->value.str, parser->formatStack)) {
     /* found a recursive definition. just return pointer */
     return new_n_formatter(Token->value.str);
   }
-  
-  x_ipc_strListPush(strdup(Token->value.str), parser->formatStack);
 
   LOCK_M_MUTEX;
   namedFormat = 
     (NAMED_FORMAT_PTR)x_ipc_hashTableFind(Token->value.str,
-				    GET_M_GLOBAL(formatNamesTable));
+					  GET_M_GLOBAL(formatNamesTable));
   UNLOCK_M_MUTEX;
   if (!namedFormat) {
 #ifdef NMP_IPC
     if (GET_C_GLOBAL(serverRead) != CENTRAL_SERVER_ID) {
       if (x_ipcQueryCentral(X_IPC_NAMED_FORM_QUERY,
-			  &Token->value.str, &format) != Success ||
+			    &Token->value.str, &format) != Success ||
 	  !format) {
         X_IPC_MOD_WARNING2("Warning: Named Format %s is not registered\n%s\n",
 			   Token->value.str, parser->ParseString);
@@ -652,14 +655,17 @@ static FORMAT_PTR Named_Format(Format_Parse_Ptr parser, TokenPtr Token)
   } else {
     /* Need to use the named formatter -- parse it now */
     if (!namedFormat->parsed) {
+      if (parser->formatStack == NULL)
+	parser->formatStack = x_ipc_strListCreate();
+      x_ipc_strListPush(strdup(Token->value.str), parser->formatStack);
       namedFormat->format = 
 	(FORMAT_PTR)ParseFormatString(namedFormat->definition);
       namedFormat->parsed = TRUE;
+      x_ipcFree((void *)x_ipc_strListPopItem(parser->formatStack));
     }
     format = copyFormatter(namedFormat->format);
   }
-  
-  x_ipcFree((void *)x_ipc_strListPopItem(parser->formatStack));
+
   return format;
 }
 

@@ -14,8 +14,8 @@
  *                       Quits the program when a 'q' is typed.
  *                       Should be run in conjunction with module2.
  *
- * $Revision: 2.5 $
- * $Date: 2009/01/12 15:54:58 $
+ * $Revision: 2.6 $
+ * $Date: 2012/02/27 16:55:47 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -25,6 +25,9 @@
  * REVISION HISTORY
  *
  * $Log: module1.c,v $
+ * Revision 2.6  2012/02/27 16:55:47  reids
+ * Fixed some problems with python and significantly improved transfer of arrays to/from python
+ *
  * Revision 2.5  2009/01/12 15:54:58  reids
  * Added BSD Open Source license info
  *

@@ -20,6 +20,17 @@
  * REVISION HISTORY
  *
  * $Log: comServer.c,v $
+ * Revision 2.13  2013/11/22 16:57:29  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
  * Revision 2.12  2011/04/21 18:17:48  reids
  * IPC 3.9.0:
  * Added NoListen options to IPC_connect, to indicate that module will not
@@ -634,8 +645,8 @@
  *  1-Dec-88 Christopher Fedor, School of Computer Science, CMU
  * created.
  *
- * $Revision: 2.12 $
- * $Date: 2011/04/21 18:17:48 $
+ * $Revision: 2.13 $
+ * $Date: 2013/11/22 16:57:29 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -1145,7 +1156,8 @@ static void NewModuleConnectHnd(DISPATCH_PTR dispatch, MOD_DATA_PTR modData)
   versionData.version.x_ipcMinor = X_IPC_VERSION_MINOR;
   versionData.direct = GET_S_GLOBAL(directDefault);
   
-  x_ipc_strListPushUnique(strdup(resource->name),dispatch->org->providesList);
+  if (!x_ipc_strListMemberItem(resource->name, dispatch->org->providesList))
+    x_ipc_strListPush(strdup(resource->name),dispatch->org->providesList);
   centralReply(dispatch, (char *)&versionData);
   
   /* Don't free the modData: It is stored with the module */
@@ -1387,9 +1399,8 @@ void centralRegisterLengthFormatter(char *formatterName, int32 length)
 
 /***********************************************************************/
 
-void _centralRegisterHandler(const char *msgName, 
-			     const char *hndName,
-			     X_IPC_HND_FN hndProc)
+void _centralRegisterHandler(const char *msgName, const char *hndName,
+			     X_IPC_HND_FN hndProc, BOOLEAN autoUnmarshall)
 {
   HND_DATA_PTR hndData;
   HND_PTR hnd;
@@ -1405,6 +1416,7 @@ void _centralRegisterHandler(const char *msgName,
   hndData->hndName = strdup(hndName);
   
   hnd = x_ipc_selfRegisterHnd(0, GET_S_GLOBAL(x_ipcServerModGlobal), hndData, hndProc);
+  hnd->autoUnmarshall = autoUnmarshall;
   if (hnd->hndData != hndData) {
     x_ipcFree((char *)hndData->msgName);
     x_ipcFree((char *)hndData->hndName);
@@ -1427,7 +1439,7 @@ static int32 addPendItem(RESOURCE_PTR newResource, DISPATCH_PTR dispatch)
 {
   LOG_STATUS1("   Transferring %s", DISPATCH_MSG_NAME(dispatch));
   Log_RefId(dispatch, LOGGING_STATUS);
-  LOG_STATUS2(" from Resource %s to %s", dispatch->hnd->resource->name,
+  LOG_STATUS2(" from Resource %s to %s\n", dispatch->hnd->resource->name,
 	     newResource->name);
   
   x_ipc_listInsertItem((void *)dispatch, newResource->pendingList);
@@ -1670,8 +1682,7 @@ static void getMsgInfoHnd(DISPATCH_PTR dispatch, char *name)
   if (msg != NULL) {
     msgInfo.msgFormat = (char *)msg->msgFormatStr;
     msgInfo.resFormat = (char *)msg->resFormatStr;
-    msgInfo.msg_class = 
-      msgInfo.msg_class = msg->msgData->msg_class;
+    msgInfo.msg_class = msg->msgData->msg_class;
     msgInfo.numberOfHandlers = x_ipc_listLength(msg->hndList);
     if (msgInfo.numberOfHandlers > 0) {
       msgInfo.resourceName = 
@@ -2972,9 +2983,13 @@ void listenLoop(void)
 
 static void recordBroadcast(const char *name, BOOLEAN active)
 {
+  if (strncmp(VAR_WATCH_PREFIX, name, strlen(VAR_WATCH_PREFIX)) == 0) {
+    return; // Don't bother recording internal (watch) messages
+  }
+
   if (active) {
     if (!x_ipc_strListMemberItem(name, GET_C_GLOBAL(broadcastMsgs))) {
-      x_ipc_strListPushUnique(strdup(name), GET_C_GLOBAL(broadcastMsgs));
+      x_ipc_strListPush(strdup(name), GET_C_GLOBAL(broadcastMsgs));
       centralSetVar(X_IPC_BROADCAST_MSG_VAR, 
 		    (char *)GET_C_GLOBAL(broadcastMsgs));
     }

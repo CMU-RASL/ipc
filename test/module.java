@@ -8,8 +8,8 @@
  *
  * ABSTRACT: Public class file for module1, module2 and module3 test programs
  *
- * $Revision: 2.2 $
- * $Date: 2009/01/12 15:54:58 $
+ * $Revision: 2.3 $
+ * $Date: 2013/07/24 20:01:01 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -19,6 +19,9 @@
  * REVISION HISTORY
  *
  * $Log: module.java,v $
+ * Revision 2.3  2013/07/24 20:01:01  reids
+ * Updating lisp, java, python test programs to adhere to updated API
+ *
  * Revision 2.2  2009/01/12 15:54:58  reids
  * Added BSD Open Source license info
  *
@@ -30,30 +33,34 @@
 
 public class module {
   /* STATUS_ENUM */
-  protected static final int WaitVal    = 0;
-  protected static final int SendVal    = 1;
-  protected static final int ReceiveVal = 2;
-  protected static final int ListenVal  = 3;
+  public enum Status {WaitVal, SendVal, ReceiveVal, ListenVal}
 
-  protected static class T1 {
-      public int i1;
-      public int status; /* STATUS_ENUM */
-      public double matrix[/*2*/][/*3*/];
-      public double d1;
-      public String toString () {
-	String str = "{" + i1 +", "+ Integer.toString(status) +", [";
-	for (int i=0; i<matrix.length; i++) {
-	    str += "[";
-	    for (int j=0; j<matrix[i].length; j++) {
-		str += matrix[i][j];
-		if (j != matrix[i].length-1) str += ", ";
-	    }
-	    str += "]";
-	    if (i != matrix.length-1) str += ", ";
+  private static String statusToString (Status status) {
+    return (status == Status.WaitVal ? "WaitVal"
+	    : status == Status.SendVal ? "SendVal"
+	    : status == Status.ReceiveVal ? "ReceiveVal"
+	    : status == Status.ListenVal ? "ListenVal" : "???");
+  }
+
+  public static class T1 {
+    public int i1;
+    public Status status;
+    public double matrix[/*2*/][/*3*/];
+    public double d1;
+    public String toString () {
+      String str = "{" + i1 +", "+ statusToString(status) +", [";
+      for (int i=0; i<matrix.length; i++) {
+	str += "[";
+	for (int j=0; j<matrix[i].length; j++) {
+	  str += matrix[i][j];
+	  if (j != matrix[i].length-1) str += ", ";
 	}
 	str += "]";
-	return str +", "+ d1 +"}";
+	if (i != matrix.length-1) str += ", ";
       }
+      str += "]";
+      return str +", "+ d1 +"}";
+    }
   }
 
   protected static final String T1_NAME  = "T1";
@@ -61,22 +68,17 @@ public class module {
   protected static final String  T1_FORMAT =
       "{int, {enum : 3}, [double:2,3], double}";
 
-  protected static class T2 {
+  public static class T2 {
     public String str1;
     public int count;
     public T1 t1[]; /* Variable length array of type T1_TYPE */
-    public int status; /* STATUS_ENUM */
+    public Status status;
 
     public String toString () {
       String str = "{\"" + str1 +"\", "+ count +", ";
       str += "<";
       for (int i = 0; i<count; i++) str += t1[i].toString();
-      str += ">, ";
-      str += (status == WaitVal ? "WaitVal"
-	      : status == SendVal ? "SendVal"
-	      : status == ReceiveVal ? "ReceiveVal"
-	      : status == ListenVal ? "ListenVal" : Integer.toString(status));
-      return str +"]";
+      return str + ">, " + statusToString(status) +"]";
     }
   }
 

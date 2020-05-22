@@ -1,7 +1,7 @@
 /*****************************************************************************
- *       $Id: formatters.java,v 1.6 2009/09/04 19:11:20 reids Exp $
- * $Revision: 1.6 $
- *     $Date: 2009/09/04 19:11:20 $
+ *       $Id: formatters.java,v 1.7 2013/07/23 21:11:38 reids Exp $
+ * $Revision: 1.7 $
+ *     $Date: 2013/07/23 21:11:38 $
  *   $Author: reids $
  *    $State: Exp $
  *   $Locker:  $
@@ -18,6 +18,9 @@
  *     Simplified BSD License (see ipc/LICENSE.TXT)
  *
  * $Log: formatters.java,v $
+ * Revision 1.7  2013/07/23 21:11:38  reids
+ * Updated for using SWIG
+ *
  * Revision 1.6  2009/09/04 19:11:20  reids
  * IPC Java is now in its own package
  *
@@ -46,10 +49,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Array;
 
 public class formatters {
-  public static class VARCONTENT {
-    public int length;
-    public long byteArray;
-  }
 
   public static final int PrimitiveFMT  = 0;
   public static final int LengthFMT     = 1;
@@ -61,51 +60,32 @@ public class formatters {
   public static final int NamedFMT      = 7;
   public static final int EnumFMT       = 8;
 
-  private native static int formatType(long formatter);
-  private native static int formatPrimitiveProc(long formatter);
-  private native static long formatChoosePtrFormat(long formatter, 
-						   long parentFormat);
-  private native static long formatFormatArray(long formatter);
-  private native static int formatFormatArrayMax(long formatArray);
-  private native static long formatFormatArrayItemPtr(long formatArray, int n);
-  private native static int formatFormatArrayItemInt(long formatArray, int n);
-  private native static long findNamedFormat(long format);
-  private native static boolean checkMarshallStatus(long formatter);
-  private native static long createBuffer(long byteArray);
-  private native static void freeBuffer(long buffer);
-  private native static int bufferLength(long buffer);
-  private native static long createByteArray(int length);
-  // For debugging purposes
-  private native static void rewindBuffer(long buffer);
-  private native static void printBuffer(long buffer);
-  private native static void printByteArray(long byteArray, int length);
-  private native static int parseFormat(String format);
-
-  private static boolean isSimpleType (long format) throws Exception {
-    return (formatType(format) == PrimitiveFMT &&
-	    primFmttrs.SimpleType(formatPrimitiveProc(format)));
+  private static boolean isSimpleType (FORMAT_TYPE format) throws Exception {
+    return (IPC.formatType(format) == PrimitiveFMT &&
+	    primFmttrs.SimpleType(IPC.formatPrimitiveProc(format)));
   }
 
-  private static long fixedArrayNumElements (long formatArray) {
+  private static long fixedArrayNumElements (FORMAT_TYPE formatArray) {
     int i, numElements = 1;
-    int n = formatFormatArrayMax(formatArray);
+    int n = IPC.formatFormatArrayMax(formatArray);
 
     for (i=2; i<n; i++)
-      numElements *= formatFormatArrayItemInt(formatArray, i);
+      numElements *= IPC.formatFormatArrayItemInt(formatArray, i);
     return numElements;
   }
 
-  private static int varArrayDimSize (int dim, long formatArray,
+  private static int varArrayDimSize (int dim, FORMAT_TYPE formatArray,
 				      Object dataStruct) throws Exception {
-    int sizePlace = formatFormatArrayItemInt(formatArray, dim);
+    int sizePlace = IPC.formatFormatArrayItemInt(formatArray, dim);
     int size = primFmttrs.getIntField(dataStruct, sizePlace-1);
     return size;
   }
 
-  private static int varArrayNumElements (long formatArray, Object dataStruct)
+  private static int varArrayNumElements (FORMAT_TYPE formatArray,
+					  Object dataStruct)
     throws Exception {
     int i, numElements = 1;
-    int n = formatFormatArrayMax(formatArray);
+    int n = IPC.formatFormatArrayMax(formatArray);
 
     for (i=2; i<n; i++)
       numElements *= varArrayDimSize(i, formatArray, dataStruct);
@@ -114,14 +94,15 @@ public class formatters {
 
   /* dataStruct is non-null if this is a variable length array */
   private static int arrayBufferSize (Object[] array, int dim, int max,
-				      long formatArray, long arrayFormat,
+				      FORMAT_TYPE formatArray,
+				      FORMAT_TYPE arrayFormat,
 				      Object dataStruct) 
     throws Exception {
     int bufSize = 0;
-    int len = (dataStruct == null ? formatFormatArrayItemInt(formatArray, dim)
+    int len = (dataStruct == null ? IPC.formatFormatArrayItemInt(formatArray, dim)
 	       : varArrayDimSize(dim, formatArray, dataStruct));
     for (int i=0; i<len; i++) {
-      bufSize += (dim == max ? bufferSize1(arrayFormat, array[i], 0, 0, true)
+      bufSize += (dim == max ? bufferSize1(arrayFormat, array[i], 0, null, true)
 		  : arrayBufferSize((Object[])array[i], dim+1, max, 
 				    formatArray, arrayFormat, dataStruct));
     }
@@ -129,24 +110,26 @@ public class formatters {
   }
 
   /* dataStruct is non-null if this is a variable length array */
-  private static void arrayTransferToBuffer (Object array, long buffer,
-					     int dim, int max, 
-					     boolean isSimple,
-					     long formatArray, long arrayFormat,
-					     Object dataStruct) 
+  private static void 
+      arrayTransferToBuffer (Object array, BUFFER_TYPE buffer,
+			     int dim, int max, boolean isSimple,
+			     FORMAT_TYPE formatArray, FORMAT_TYPE arrayFormat,
+			     Object dataStruct) 
     throws Exception {
       int i, len = (dataStruct == null
-		    ? formatFormatArrayItemInt(formatArray, dim)
+		    ? IPC.formatFormatArrayItemInt(formatArray, dim)
 		    : varArrayDimSize(dim, formatArray, dataStruct));
     for (i=0; i<len; i++) {
       if (dim != max) {
 	arrayTransferToBuffer(((Object[])array)[i], buffer, dim+1, max,
 			      isSimple, formatArray, arrayFormat, dataStruct);
       } else if (isSimple) {
-	primFmttrs.EncodeElement(formatPrimitiveProc(arrayFormat), 
+	primFmttrs.EncodeElement(IPC.formatPrimitiveProc(arrayFormat),
 				 array, i, buffer);
+      } else if (IPC.formatType(arrayFormat) == EnumFMT) {
+	primFmttrs.EncodeElement(primFmttrs.ENUM_FMT, array, i, buffer);
       } else {
-	transferToBuffer(arrayFormat, ((Object[])array)[i], 0, buffer, 0, 
+	transferToBuffer(arrayFormat, ((Object[])array)[i], 0, buffer, null, 
 			 true);
       }
     }
@@ -154,15 +137,16 @@ public class formatters {
 
   /* dataStruct is non-null if this is a variable length array */
   private static void
-  arrayTransferToDataStructure (Object array, long buffer, int dim, int max, 
-				int len, boolean isSimple, long formatArray,
-				long arrayFormat, Object dataStruct) 
+  arrayTransferToDataStructure (Object array, BUFFER_TYPE buffer, int dim,
+				int max, int len, boolean isSimple,
+				FORMAT_TYPE formatArray,
+				FORMAT_TYPE arrayFormat, Object dataStruct) 
     throws Exception {
     int i, nextLen=0;
 
     if (dim != max) 
 	nextLen = (dataStruct == null
-		   ? formatFormatArrayItemInt(formatArray, dim+1)
+		   ? IPC.formatFormatArrayItemInt(formatArray, dim+1)
 		   : varArrayDimSize(dim+1, formatArray, dataStruct));
     for (i=0; i<len; i++) {
       if (dim != max) {
@@ -173,12 +157,14 @@ public class formatters {
 				     nextLen, isSimple, formatArray,
 				     arrayFormat, dataStruct);
       } else if (isSimple) {
-	primFmttrs.DecodeElement(formatPrimitiveProc(arrayFormat), 
+	primFmttrs.DecodeElement(IPC.formatPrimitiveProc(arrayFormat),
 				 array, i, buffer);
+      } else if (IPC.formatType(arrayFormat) == EnumFMT) {
+	primFmttrs.DecodeElement(primFmttrs.ENUM_FMT, array, i, buffer);
       } else {
 	Array.set(array, i, validateObject(((Object[])array)[i], array, -1));
 	transferToDataStructure(arrayFormat, ((Object[])array)[i], 0,
-				buffer, 0, true);
+				buffer, null, true);
       }
     }
   }
@@ -228,13 +214,13 @@ public class formatters {
     return arrayObject;
   }
 
-  private static boolean feasibleToDecodeVarArray(int size, long formatArray,
-						  int dStart) {
-    int max = formatFormatArrayMax(formatArray);
+  private static boolean 
+      feasibleToDecodeVarArray(int size, FORMAT_TYPE formatArray, int dStart) {
+    int max = IPC.formatFormatArrayMax(formatArray);
 
     if (max > 3) { // Number of dimensions is max-2
       for (int i=2; i<max; i++) {
-	if (formatFormatArrayItemInt(formatArray, i) > dStart) {
+	if (IPC.formatFormatArrayItemInt(formatArray, i) > dStart) {
 	  return false;
 	}
       }
@@ -242,32 +228,32 @@ public class formatters {
     return true;
   }
 
-  private static int bufferSize1 (long format, Object dataStruct, 
-				  int dStart, long parentFormat, 
+  private static int bufferSize1 (FORMAT_TYPE format, Object dataStruct, 
+				  int dStart, FORMAT_TYPE parentFormat, 
 				  boolean isTopLevelStruct) 
     throws Exception {
     int bufSize = 0;
     Object struct;
 
-    switch (formatType(format)) {
+    switch (IPC.formatType(format)) {
     case LengthFMT:
       throw new Exception("JAVA version of IPC can only use explicit formats");
 
     case PrimitiveFMT:
-      int primType = formatPrimitiveProc(format);
+      int primType = IPC.formatPrimitiveProc(format);
       bufSize += primFmttrs.ELength(primType, dataStruct, dStart);
       break;
 
     case PointerFMT:
       bufSize += 1;
-      if (primFmttrs.getObjectField(dataStruct, dStart) != null)
-	bufSize += bufferSize1(formatChoosePtrFormat(format, parentFormat),
-			       dataStruct, dStart, 0, isTopLevelStruct);
+      if (primFmttrs.getPtrField(dataStruct, dStart) != null)
+	bufSize += bufferSize1(IPC.formatChoosePtrFormat(format, parentFormat),
+			       dataStruct, dStart, null, isTopLevelStruct);
       break;
 
     case StructFMT: {
-      long formatArray = formatFormatArray(format);
-      int i, structStart = 0, n = formatFormatArrayMax(formatArray);
+      FORMAT_TYPE formatArray = IPC.formatFormatArray(format);
+      int i, structStart = 0, n = IPC.formatFormatArrayMax(formatArray);
 
       struct = (isTopLevelStruct ? dataStruct
 		: primFmttrs.getObjectField(dataStruct, dStart));
@@ -275,7 +261,7 @@ public class formatters {
 	throw new Exception(invalidStructFormat(struct, n));
       }
       for (i=1; i<n; i++) {
-	bufSize += bufferSize1(formatFormatArrayItemPtr(formatArray, i),
+	bufSize += bufferSize1(IPC.formatFormatArrayItemPtr(formatArray, i),
 			       struct, structStart, format, false);
 	structStart++;
       }
@@ -283,27 +269,27 @@ public class formatters {
     }
 
     case FixedArrayFMT: {
-      long formatArray = formatFormatArray(format);
-      long nextFormat = formatFormatArrayItemPtr(formatArray, 1);
+      FORMAT_TYPE formatArray = IPC.formatFormatArray(format);
+      FORMAT_TYPE nextFormat = IPC.formatFormatArrayItemPtr(formatArray, 1);
       Object arrayObject = (isTopLevelStruct ? dataStruct :
 			    primFmttrs.getObjectField(dataStruct, dStart));
 
       if (!arrayObject.getClass().isArray()) {
 	throw new Exception(invalidArrayFormat(dataStruct, dStart));
       } else if (isSimpleType(nextFormat)) {
-	bufSize += (bufferSize1(nextFormat, arrayObject, 0, 0, false) *
+	bufSize += (bufferSize1(nextFormat, arrayObject, 0, null, false) *
 		    fixedArrayNumElements(formatArray));
       } else {
 	bufSize += arrayBufferSize((Object[])arrayObject, 2, 
-				   formatFormatArrayMax(formatArray)-1,
+				   IPC.formatFormatArrayMax(formatArray)-1,
 				   formatArray, nextFormat, null);
       }
       break;
     }
 
     case VarArrayFMT: {
-      long formatArray = formatFormatArray(format);
-      long nextFormat = formatFormatArrayItemPtr(formatArray, 1);
+      FORMAT_TYPE formatArray = IPC.formatFormatArray(format);
+      FORMAT_TYPE nextFormat = IPC.formatFormatArrayItemPtr(formatArray, 1);
       Object arrayObject = (isTopLevelStruct ? dataStruct :
 			    primFmttrs.getObjectField(dataStruct, dStart));
 
@@ -313,64 +299,64 @@ public class formatters {
       if (!arrayObject.getClass().isArray()) {
 	throw new Exception(invalidArrayFormat(dataStruct, dStart));
       } else if (isSimpleType(nextFormat)) {
-	bufSize += (bufferSize1(nextFormat, arrayObject, 0, 0, false) *
+	bufSize += (bufferSize1(nextFormat, arrayObject, 0, null, false) *
 		    varArrayNumElements(formatArray, dataStruct));
       } else {
 	bufSize += arrayBufferSize((Object[])arrayObject, 2, 
-				   formatFormatArrayMax(formatArray)-1,
+				   IPC.formatFormatArrayMax(formatArray)-1,
 				   formatArray, nextFormat, dataStruct);
       }
       break;
     }
 
     case NamedFMT:
-      bufSize += bufferSize1(findNamedFormat(format), dataStruct, dStart,
+      bufSize += bufferSize1(IPC.findNamedFormat(format), dataStruct, dStart,
 			     parentFormat, isTopLevelStruct);
       break;
 
     case EnumFMT:
-      bufSize += primFmttrs.ELength(primFmttrs.INT_FMT, null, 0);
+      bufSize += primFmttrs.ELength(primFmttrs.ENUM_FMT, null, 0);
       break;
     }
     return bufSize;
   }
 
-  private static int bufferSize (long formatter, Object object,
+  private static int bufferSize (FORMAT_TYPE formatter, Object object,
 				 boolean isTopLevelStruct) 
       throws Exception {
-    int val = (formatter == 0 ? 0 : bufferSize1(formatter, object, 0, 0,
-						isTopLevelStruct));
+    int val = (formatter == null ? 0 : bufferSize1(formatter, object, 0,
+						   null, isTopLevelStruct));
     return val;
   }
 
-  private static void transferToBuffer (long format, Object dataStruct, 
-					int dStart, long buffer, 
-					long parentFormat, 
+  private static void transferToBuffer (FORMAT_TYPE format, Object dataStruct, 
+					int dStart, BUFFER_TYPE buffer, 
+					FORMAT_TYPE parentFormat, 
 					boolean isTopLevelStruct) 
     throws Exception {
     Object struct;
 
-    switch (formatType(format)) {
+    switch (IPC.formatType(format)) {
     case LengthFMT:
       throw new Exception("JAVA version of IPC can only use explicit formats");
 
     case PrimitiveFMT:
-      primFmttrs.Encode(formatPrimitiveProc(format), dataStruct, dStart,
+      primFmttrs.Encode(IPC.formatPrimitiveProc(format), dataStruct, dStart,
 			buffer);
       break;
 
     case PointerFMT:
-      Object object = primFmttrs.getObjectField(dataStruct, dStart);
-      /* 'Z' means data, 0 means NIL */
-      primFmttrs.formatPutChar(buffer, (object != null ? 'Z' : '\0'));
+      Object object = primFmttrs.getPtrField(dataStruct, dStart);
+      /* 'Z' means data, 0 means null */
+      IPC.formatPutChar(buffer, (object != null ? 'Z' : '\0'));
       if (object != null)
-	transferToBuffer(formatChoosePtrFormat(format, parentFormat),
-			 dataStruct, dStart, buffer, 0, isTopLevelStruct);
+	transferToBuffer(IPC.formatChoosePtrFormat(format, parentFormat),
+			 dataStruct, dStart, buffer, null, isTopLevelStruct);
       break;
 
     case StructFMT: {
-      long formatArray = formatFormatArray(format);
-      int i, structStart = 0, n = formatFormatArrayMax(formatArray);
+      FORMAT_TYPE formatArray = IPC.formatFormatArray(format);
+      int i, structStart = 0, n = IPC.formatFormatArrayMax(formatArray);
 
       struct = (isTopLevelStruct ? dataStruct
 		: primFmttrs.getObjectField(dataStruct, dStart));
@@ -378,7 +364,7 @@ public class formatters {
 	throw new Exception(invalidStructFormat(struct, n));
       }
       for (i=1; i<n; i++) {
-	transferToBuffer(formatFormatArrayItemPtr(formatArray, i),
+	transferToBuffer(IPC.formatFormatArrayItemPtr(formatArray, i),
 			 struct, structStart, buffer, format, false);
 	structStart++;
       }
@@ -386,8 +372,8 @@ public class formatters {
     }
 
     case FixedArrayFMT: {
-      long formatArray = formatFormatArray(format);
-      long  nextFormat = formatFormatArrayItemPtr(formatArray, 1);
+      FORMAT_TYPE formatArray = IPC.formatFormatArray(format);
+      FORMAT_TYPE  nextFormat = IPC.formatFormatArrayItemPtr(formatArray, 1);
       Object arrayObject = (isTopLevelStruct ? dataStruct :
 			    primFmttrs.getObjectField(dataStruct, dStart));
 
@@ -395,7 +381,7 @@ public class formatters {
 	throw new Exception(invalidArrayFormat(dataStruct, dStart));
       } else {
 	arrayTransferToBuffer(arrayObject, buffer, 2, 
-			      formatFormatArrayMax(formatArray)-1,
+			      IPC.formatFormatArrayMax(formatArray)-1,
 			      isSimpleType(nextFormat),
 			      formatArray, nextFormat, null);
       }
@@ -403,20 +389,19 @@ public class formatters {
     }
 
     case VarArrayFMT: {
-      long formatArray = formatFormatArray(format);
-      long nextFormat = formatFormatArrayItemPtr(formatArray, 1);
+      FORMAT_TYPE formatArray = IPC.formatFormatArray(format);
+      FORMAT_TYPE nextFormat = IPC.formatFormatArrayItemPtr(formatArray, 1);
       Object arrayObject = (isTopLevelStruct ? dataStruct :
 			    primFmttrs.getObjectField(dataStruct, dStart));
 
       /* For the size of the array */
-      primFmttrs.formatPutInt(buffer, varArrayNumElements(formatArray,
-							  dataStruct));
+      IPC.formatPutInt(buffer, varArrayNumElements(formatArray, dataStruct));
       
       if (!arrayObject.getClass().isArray()) {
 	throw new Exception(invalidArrayFormat(dataStruct, dStart));
       } else {
 	arrayTransferToBuffer(arrayObject, buffer, 2, 
-			      formatFormatArrayMax(formatArray)-1,
+			      IPC.formatFormatArrayMax(formatArray)-1,
 			      isSimpleType(nextFormat),
 			      formatArray, nextFormat, dataStruct);
       }
@@ -424,46 +409,47 @@ public class formatters {
     }
 
     case NamedFMT:
-      transferToBuffer(findNamedFormat(format), dataStruct, dStart, buffer,
-		       parentFormat, isTopLevelStruct);
+      transferToBuffer(IPC.findNamedFormat(format), dataStruct, 
+		       dStart, buffer, parentFormat, isTopLevelStruct);
       break;
 
     case EnumFMT:
-      primFmttrs.Encode(primFmttrs.INT_FMT, dataStruct, dStart, buffer);
+      primFmttrs.Encode(primFmttrs.ENUM_FMT, dataStruct, dStart, buffer);
       break;
     }
   }
 
-  private static void transferToDataStructure (long format, Object dataStruct, 
-					       int dStart, long buffer,
-					       long parentFormat, 
-					       boolean isTopLevelStruct) 
+  private static void 
+      transferToDataStructure (FORMAT_TYPE format, Object dataStruct, 
+			       int dStart, BUFFER_TYPE buffer,
+			       FORMAT_TYPE parentFormat,
+			       boolean isTopLevelStruct) 
     throws Exception {
     Object struct;
 
-    switch (formatType(format)) {
+    switch (IPC.formatType(format)) {
     case LengthFMT:
       throw new Exception("JAVA version of IPC can only use explicit formats");
 
     case PrimitiveFMT:
-      primFmttrs.Decode(formatPrimitiveProc(format), dataStruct, dStart,
+      primFmttrs.Decode(IPC.formatPrimitiveProc(format), dataStruct, dStart,
 			buffer);
       break;
 
     case PointerFMT: {
-      char c = primFmttrs.formatGetChar(buffer);
+      char c = IPC.formatGetChar(buffer);
       if (c == '\0') {
 	primFmttrs.setObjectField(dataStruct, dStart, null);
       } else {
-	transferToDataStructure(formatChoosePtrFormat(format, parentFormat),
-				dataStruct, dStart, buffer, 0,
+	transferToDataStructure(IPC.formatChoosePtrFormat(format, parentFormat),
+				dataStruct, dStart, buffer, null,
 				isTopLevelStruct);
       }
       break;
     }
     case StructFMT: {
-      long formatArray = formatFormatArray(format);
-      int i, structStart = 0, n = formatFormatArrayMax(formatArray);
+      FORMAT_TYPE formatArray = IPC.formatFormatArray(format);
+      int i, structStart = 0, n = IPC.formatFormatArrayMax(formatArray);
 
       if (isTopLevelStruct) {
 	struct = dataStruct;
@@ -478,7 +464,7 @@ public class formatters {
 	throw new Exception(invalidStructFormat(struct, n));
       }
       for (i=1; i<n; i++) {
-	transferToDataStructure(formatFormatArrayItemPtr(formatArray, i),
+	transferToDataStructure(IPC.formatFormatArrayItemPtr(formatArray, i),
 				struct, structStart, buffer, format, false);
 	structStart++;
       }
@@ -486,9 +472,9 @@ public class formatters {
     }
 
     case FixedArrayFMT: {
-      long formatArray = formatFormatArray(format);
-      long nextFormat = formatFormatArrayItemPtr(formatArray, 1);
-      int size = formatFormatArrayItemInt(formatArray, 2);
+      FORMAT_TYPE formatArray = IPC.formatFormatArray(format);
+      FORMAT_TYPE nextFormat = IPC.formatFormatArrayItemPtr(formatArray, 1);
+      int size = IPC.formatFormatArrayItemInt(formatArray, 2);
       Object arrayObject;
 
       if (isTopLevelStruct) {
@@ -504,7 +490,7 @@ public class formatters {
 	throw new Exception(invalidArrayFormat(dataStruct, dStart));
       } else {
 	arrayTransferToDataStructure(arrayObject, buffer, 2, 
-				     formatFormatArrayMax(formatArray)-1,
+				     IPC.formatFormatArrayMax(formatArray)-1,
 				     size, isSimpleType(nextFormat),
 				     formatArray, nextFormat, null);
       }
@@ -512,11 +498,11 @@ public class formatters {
     }
 
     case VarArrayFMT: {
-      long formatArray = formatFormatArray(format);
-      long nextFormat = formatFormatArrayItemPtr(formatArray, 1);
+      FORMAT_TYPE formatArray = IPC.formatFormatArray(format);
+      FORMAT_TYPE nextFormat = IPC.formatFormatArrayItemPtr(formatArray, 1);
       /* The total size of the array is the stored first */
-      int size = primFmttrs.formatGetInt(buffer);
-      int numDims = formatFormatArrayMax(formatArray)-2;
+      int size = IPC.formatGetInt(buffer);
+      int numDims = IPC.formatFormatArrayMax(formatArray)-2;
       Object arrayObject;
 
       if (numDims > 1) size = varArrayDimSize(2, formatArray, dataStruct);
@@ -546,36 +532,38 @@ public class formatters {
     }
 
     case NamedFMT:
-      transferToDataStructure(findNamedFormat(format), dataStruct, dStart,
+      transferToDataStructure(IPC.findNamedFormat(format), dataStruct, dStart,
 			      buffer, parentFormat, isTopLevelStruct);
       break;
 
     case EnumFMT:
-      primFmttrs.Decode(primFmttrs.INT_FMT, dataStruct, dStart, buffer);
+      primFmttrs.Decode(primFmttrs.ENUM_FMT, dataStruct, dStart, buffer);
       break;
     }
   }
 
-  private static void encodeData (long formatter, Object object, long buffer)
+  private static void encodeData (FORMAT_TYPE formatter, Object object, 
+				  BUFFER_TYPE buffer)
       throws Exception {
-    transferToBuffer(formatter, object, 0, buffer, 0, true);
+    transferToBuffer(formatter, object, 0, buffer, null, true);
   }
 
-  private static void decodeData (long formatter, long buffer, Object object) 
+  private static void decodeData (FORMAT_TYPE formatter, BUFFER_TYPE buffer,
+				  Object object) 
     throws Exception {
-    transferToDataStructure(formatter, object, 0, buffer, 0, true);
+    transferToDataStructure(formatter, object, 0, buffer, null, true);
   }
 
-  public static void checkDataClass (long format, Class oclass)
+  public static void checkDataClass (FORMAT_TYPE format, Class oclass)
       throws Exception {
-   switch (formatType(format)) {
+   switch (IPC.formatType(format)) {
     case LengthFMT:
       throw new Exception("JAVA version of IPC can only use explicit formats");
 
     case PrimitiveFMT:
       boolean matches = true;
       String neededType = null;
-      switch (formatPrimitiveProc(format)) {
+      switch (IPC.formatPrimitiveProc(format)) {
       case primFmttrs.INT_FMT:
       case primFmttrs.UINT_FMT:
 	neededType = "int";
@@ -616,11 +604,11 @@ public class formatters {
       break;
 
     case PointerFMT: {
-      checkDataClass(formatChoosePtrFormat(format, 0), oclass);
+      checkDataClass(IPC.formatChoosePtrFormat(format, null), oclass);
       break;
     }
     case StructFMT: {
-      int n = formatFormatArrayMax(formatFormatArray(format));
+      int n = IPC.formatFormatArrayMax(IPC.formatFormatArray(format));
       if (oclass.getFields().length < n-1) {
 	throw new Exception(invalidStructFormat(oclass, n));
       }
@@ -637,13 +625,13 @@ public class formatters {
     }
 
     case NamedFMT:
-      checkDataClass(findNamedFormat(format), oclass);
+      checkDataClass(IPC.findNamedFormat(format), oclass);
       break;
 
     case EnumFMT:
-      if (!(oclass == int.class || oclass == Integer.class)) {
+      if (!Enum.class.isAssignableFrom(oclass)) {
 	throw new Exception("\""+ oclass.getName() +"\" does not match format"
-			    +" -- needs to be int (enum)");
+			    +" -- needs to be enum");
       }
       break;
     }
@@ -652,47 +640,51 @@ public class formatters {
   /* Marshalls the object into a byte array.
      Fills in the VARCONTENT structure with the length and byteArray.
      "formatter" is a C pointer. Returns any error conditions. */
-  public static int marshall (long formatter, Object object, 
-			      VARCONTENT varcontent) throws Exception {
-    if (!checkMarshallStatus(formatter)) {
-      return IPC.IPC_Error;
+  public static IPC_RETURN_TYPE 
+      marshall (FORMAT_TYPE formatter, Object object, 
+		IPC_VARCONTENT_TYPE varcontent) throws Exception {
+    if (IPC.checkMarshallStatus(formatter) == 0) {
+      return IPC_RETURN_TYPE.IPC_Error;
     } else {
-      varcontent.length = bufferSize(formatter, object, true);
-      varcontent.byteArray = 0;
-      if (varcontent.length > 0) {
-	varcontent.byteArray = createByteArray(varcontent.length);
-	long buffer = createBuffer(varcontent.byteArray);
+      varcontent.setLength(bufferSize(formatter, object, true));
+      varcontent.setContent(null);
+      if (varcontent.getLength() > 0) {
+	varcontent.setContent(IPC.createByteArray((int)varcontent.getLength()));
+	BUFFER_TYPE buffer = IPC.createBuffer(varcontent.getContent());
 	encodeData(formatter, object, buffer);
-	if (bufferLength(buffer) != varcontent.length)
+	if (IPC.bufferLength(buffer) != varcontent.getLength())
 	  throw new Exception("Mismatch between buffer size ("+
-			      varcontent.length+") and encoded data ("+
-			      bufferLength(buffer)+")");
-	freeBuffer(buffer);
+			      varcontent.getLength()+") and encoded data ("+
+			      IPC.bufferLength(buffer)+")");
+	IPC.freeBuffer(buffer);
       }
-      return IPC.IPC_OK;
+      return IPC_RETURN_TYPE.IPC_OK;
     }
   }
 
   /* Fills in the slots of the object according to the formatter.
      "byteArray" and "formatter" are both C pointers.
      Returns any error conditions. */
-  public static int unmarshall (long formatter, long byteArray, Object object) 
+  public static IPC_RETURN_TYPE unmarshall (FORMAT_TYPE formatter,
+					    SWIGTYPE_p_void byteArray,
+					    Object object) 
       throws Exception {
-    if (!checkMarshallStatus(formatter)) {
-      return IPC.IPC_Error;
+    if (IPC.checkMarshallStatus(formatter) == 0) {
+      return IPC_RETURN_TYPE.IPC_Error;
     } else {
-      if (formatter != 0) {
-	long buffer = createBuffer(byteArray);
+      if (formatter != null) {
+	BUFFER_TYPE buffer = IPC.createBuffer(byteArray);
 	decodeData(formatter, buffer, object);
-	freeBuffer(buffer);
+	IPC.freeBuffer(buffer);
       }
-      return IPC.IPC_OK;
+      return IPC_RETURN_TYPE.IPC_OK;
     }
   }
 
-  public static Object createFixedArray(Class arrayClass, long formatter) 
+  public static Object createFixedArray(Class arrayClass,
+					FORMAT_TYPE formatter) 
       throws Exception {
-    int size = formatFormatArrayItemInt(formatFormatArray(formatter), 2);
+    int size = IPC.formatFormatArrayItemInt(IPC.formatFormatArray(formatter), 2);
     return Array.newInstance(arrayClass, size);
   }
 

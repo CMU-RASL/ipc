@@ -8,8 +8,8 @@
 ;;
 ;; ABSTRACT: Include file for LISP version of IPC test programs
 ;;
-;; $Revision: 2.2 $
-;; $Date: 2009/01/12 15:54:58 $
+;; $Revision: 2.3 $
+;; $Date: 2013/07/24 20:01:01 $
 ;; $Author: reids $
 ;;
 ;; Copyright (c) 2008, Carnegie Mellon University
@@ -19,6 +19,9 @@
 ;; REVISION HISTORY
 ;;
 ;; $Log: module.lisp,v $
+;; Revision 2.3  2013/07/24 20:01:01  reids
+;; Updating lisp, java, python test programs to adhere to updated API
+;;
 ;; Revision 2.2  2009/01/12 15:54:58  reids
 ;; Added BSD Open Source license info
 ;;
@@ -41,13 +44,17 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(eval-when (load eval)
+  (load (make-pathname :directory (butlast (pathname-directory *load-truename*))
+		     :name "lisp/IPC")))
+
 ;;; typedef enum { WaitVal, SendVal, ReceiveVal, ListenVal } STATUS_ENUM;
 (defconstant STATUS_ENUM '(:WaitVal :SendVal :ReceiveVal :ListenVal))
 
 (IPC:IPC_defstruct (T1)
  (i1 0 :type integer)
  (status 0 :type (or integer symbol))
- (matrix NIL :type array)
+ (matrix nil :type array)
  (d1 0.0 :type double))
 
 (defconstant T1_NAME   "T1")
@@ -57,7 +64,7 @@
 (IPC:IPC_defstruct (T2)
  (str1 "" :type string)
  (count 0 :type integer)
- (t1 NIL :type array)
+ (t1 nil :type array)
  (status :ReceiveVal :type (or integer symbol)))
 
 (defconstant T2_NAME "T2")

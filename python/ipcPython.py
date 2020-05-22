@@ -6,11 +6,11 @@
 # FILE: ipcPython.py
 #
 # ABSTRACT: Python-code for interfacing specifically with the C version of IPC
-#           Used by SWIG (see ffi/IPC.i)
+#           Used by SWIG (see IPC.i)
 #
-#       $Id: ipcPython.py,v 1.2 2011/08/17 00:47:04 reids Exp $
-# $Revision: 1.2 $
-#     $Date: 2011/08/17 00:47:04 $
+#       $Id: ipcPython.py,v 1.4 2013/07/23 21:12:52 reids Exp $
+# $Revision: 1.4 $
+#     $Date: 2013/07/23 21:12:52 $
 #   $Author: reids $
 #    $State: Exp $
 #   $Locker:  $
@@ -21,6 +21,12 @@
 #
 # REVISION HISTORY
 # $Log: ipcPython.py,v $
+# Revision 1.4  2013/07/23 21:12:52  reids
+# Made consistent with other language ports
+#
+# Revision 1.3  2012/05/22 16:25:26  reids
+# Fixed a memory leak in queryResponseData
+#
 # Revision 1.2  2011/08/17 00:47:04  reids
 # Removed mention of IPC_freeData and IPC_freeDataElements.
 # Changed the signature of IPC_unmarshall.
@@ -42,12 +48,17 @@ fdHashTable = {}
 queryHashTable = {}
 timerHashTable = {}
 hndChangeTable = {}
+msgClassHashTable = {}
 connectHandlers = []
 disconnectHandlers = []
-handlerIndex = 0
+handlerNumber = 0
 
 # Specific exception for internal IPC errors
-class IPCError(StandardError) : "Internal IPC error"
+class Error(StandardError) :
+  def __init__(self, value) : self.value = value;
+  def __str__(self) : return repr(self.value)
+
+def Raise (str) : raise Error(str)
 
 def init_python_ipc() :
   global msgHashTable, fdHashTable, queryHashTable, timerHashTable
@@ -59,9 +70,10 @@ def init_python_ipc() :
   queryHashTable = {}
   timerHashTable = {}
   hndChangeTable = {}
+  msgClassHashTable = {}
   connectHandlers = []
   disconnectHandlers = []
-  handlerIndex = 0
+  handlerNumber = 0
 
 def boolVal (retval) :
   if (retval == 1) : return True
@@ -112,23 +124,37 @@ def IPC_publish (msgName, length, content) :
   else :
     return _IPC.IPC_publish(msgName, length, content)
 
-def IPC_subscribe (msgName, handler, clientData=None) :
-  global msgHashTable
-  key = id(handler)
-  msgHashTable[key] = (handler, clientData, None, False)
-  return subscribe(msgName, handlerName(msgName, handler), key)
+def _IPC_subscribe (msgName, handler, clientData, unmarshall) :
+  global msgHashTable, handlerNumber
+  hndName = handlerName(msgName, handler)
+  try :
+    hndData = msgHashTable[hndName]
+    if (hndData[1] != clienData) :
+      print("Resetting client data for handler", hndName)
+      hndData[1] = clienData
+    hndData[0] = handler
+    hndData[2] = unmarshall
+  except : 
+    handlerNumber = handlerNumber + 1
+    hndData = (handler, clientData, unmarshall)
+    msgHashTable[hndName] = handlerNumber
+    msgHashTable[handlerNumber] = hndData
+    subscribe(msgName, hndName, handlerNumber)
+  return hndData
 
-def IPC_subscribeData (msgName, handler, clientData=None, dataClass=None) :
-  global msgHashTable
-  key = id(handler)
-  msgHashTable[key] = (handler, clientData, dataClass, True)
-  return subscribe(msgName, handlerName(msgName, handler), key)
+def IPC_subscribe (msgName, handler, clientData=None) :
+  return _IPC_subscribe(msgName, handler, clientData, False)
+
+def IPC_subscribeData (msgName, handler, clientData=None) :
+  return _IPC_subscribe(msgName, handler, clientData, True)
 
 def IPC_unsubscribe (msgName, handler) :
   global msgHashTable
-  key = id(handler)
+  hndName = handlerName(msgName, handler)
+  key = msgHashTable[hndName]
   msgHashTable[key] = None
-  return _IPC_unsubscribe(msgName, handlerName(msgName, handler))  
+  msgHashTable[hndName] = None
+  return _IPC_unsubscribe(msgName, hndName)  
 
 def IPC_subscribeFD (fd, fdHandler, clientData=None) :
   global fdHashTable
@@ -152,7 +178,8 @@ def IPC_subscribeConnect (connectHandler, clientData=None) :
   if (hndData is None) :
     connectHandlers.append([connectHandler, clientData])
   elif (hndData[1] != clientData) :
-    print "Resetting client data for connect handler", connectHandler.__name__
+    print "WARNING: Replacing connect handler client data for",\
+          connectHandler.__name__
     hndData[1] = clientData
 
   if (oldLen == 0 and len(connectHandlers) == 1) :
@@ -167,7 +194,7 @@ def IPC_subscribeDisconnect (disconnectHandler, clientData=None) :
   if (hndData is None) :
     disconnectHandlers.append([disconnectHandler, clientData])
   elif (hndData[1] != clientData) :
-    print "Resetting client data for disconnect handler", \
+    print "WARNING: Replacing disconnect handler client data for", \
           disconnectHandler.__name__
     hndData[1] = clientData
 
@@ -214,7 +241,8 @@ def IPC_subscribeHandlerChange (msgName, changeHandler, clientData=None) :
   if (hndData is None) :
     msgChangeHandlers.append([changeHandler, clientData])
   elif (hndData[1] != clientData) :
-    print "Resetting client data for change handler", changeHandler.__name__
+    print "WARNING: Replacing change handler client data for",\
+          changeHandler.__name__
     hndData[1] = clientData
 
   if (oldLen == 0 and len(msgChangeHandlers) == 1) :
@@ -240,20 +268,19 @@ def IPC_unsubscribeHandlerChange (msgName, changeHandler) :
       return unsubscribeHandlerChange(msgName)
     else : return IPC_OK
 
-def IPC_queryNotify (msgName, length, content, handler, clientData) :
-  global queryHashTable, handlerIndex
+def IPC_queryNotify (msgName, length, content, handler, clientData=None) :
+  global queryHashTable, handlerNumber
   
-  handlerIndex = handlerIndex + 1
-  queryHashTable[handlerIndex] = (handler, clientData, None, False)
-  return queryNotify(msgName, length, content, handlerIndex)
+  handlerNumber = handlerNumber + 1
+  queryHashTable[handlerNumber] = (handler, clientData, False)
+  return queryNotify(msgName, length, content, handlerNumber)
 
 def IPC_queryResponse (msgName, length, content, timeout) :
   vc = IPC_VARCONTENT_TYPE()
-  replyFormat = FORMATTER_CONTAINER_TYPE()
-  ret = queryResponse(msgName, length, content, vc, replyFormat, timeout)
+  ret = queryResponse(msgName, length, content, vc, None, timeout)
   return (vc.content, ret)
 
-def IPC_queryNotifyVC (msgName, varcontent, handler, clientData) :
+def IPC_queryNotifyVC (msgName, varcontent, handler, clientData=None) :
   return IPC_queryNotify(msgName, varcontent.length, varcontent.content,
                          handler, clientData)
 
@@ -264,19 +291,20 @@ def IPC_queryResponseVC (msgName, varcontent, timeout) :
 def IPC_marshall (formatter, data, varcontent) :
   return formatters.marshall(formatter, data, varcontent)
 
-def IPC_unmarshall (formatter, bytearray, oclass=None) :
+def IPC_unmarshall (formatter, bytearray, object) :
+ (obj, ret) = formatters.unmarshall(formatter, bytearray, object, None)
+ return ret
+
+def IPC_unmarshallData (formatter, bytearray, oclass) :
   return formatters.unmarshall(formatter, bytearray, None, oclass)
 
-def IPC_unmarshallData (formatter, bytearray, object=None, oclass=None) :
-  return formatters.unmarshall(formatter, bytearray, object, oclass)
-
 def IPC_publishData (msgName, data) :
+  varcontent = IPC_VARCONTENT_TYPE()
   if (data == None) :
     varcontent.length = 0
     varcontent.content = None
     return _IPC.IPC_publish(msgName, 0, None)
   else :
-    varcontent = IPC_VARCONTENT_TYPE()
     try :
       if (formatters.marshall(IPC_msgFormatter(msgName), data, varcontent) ==
           IPC_Error) :
@@ -286,6 +314,10 @@ def IPC_publishData (msgName, data) :
         if (varcontent.content != 0) : IPC_freeByteArray(varcontent.content)
         return retVal
     except IPC_Error : return IPC_Error
+
+def IPC_msgClass (msgName, oclass) :
+  msgClassHashTable[msgName] = oclass;
+  return IPC_OK;
 
 def IPC_respondData (msgInstance, msgName, data) :
   varcontent = IPC_VARCONTENT_TYPE()
@@ -299,31 +331,30 @@ def IPC_respondData (msgInstance, msgName, data) :
       return retVal
   except : return IPC_ERROR
 
-def IPC_queryNotifyData (msgName, data, handler, clientData=None,
-                         responseClass=None) :
-  global queryHashTable, handlerIndex
+def IPC_queryNotifyData (msgName, data, handler, clientData=None) :
+  global queryHashTable, handlerNumber
   
-  handlerIndex = handlerIndex + 1
-  queryHashTable[handlerIndex] =(handler, clientData, responseClass, True)
+  handlerNumber = handlerNumber + 1
+  queryHashTable[handlerNumber] =(handler, clientData, True)
 
+  varcontent = IPC_VARCONTENT_TYPE()
   if (data == None) :
     varcontent.length = 0
     varcontent.content = None
     return _IPC.IPC_publish(msgName, 0, None)
   else :
-    varcontent = IPC_VARCONTENT_TYPE()
     try :
       if (formatters.marshall(IPC_msgFormatter(msgName), data, varcontent) ==
           IPC_Error) :
         return IPC_Error
       else :
         retVal = queryNotify(msgName, varcontent.length, 
-	  	             varcontent.content, handlerIndex)
+	  	             varcontent.content, handlerNumber)
         if (varcontent.content != 0) : IPC_freeByteArray(varcontent.content)
         return retVal
     except : return IPC_ERROR
 
-def IPC_queryResponseData (msgName, data, timeoutMSecs, responseClass=None) :
+def IPC_queryResponseData (msgName, data, timeoutMSecs) :
   try :
     responseObject = None
     varcontent = IPC_VARCONTENT_TYPE()
@@ -335,9 +366,13 @@ def IPC_queryResponseData (msgName, data, timeoutMSecs, responseClass=None) :
                           vc, replyFormat, timeoutMSecs)
       if (varcontent.content != 0) : IPC_freeByteArray(varcontent.content)
       if (ret == IPC_OK) :
+        responseClass = getMsgClass(replyFormat.msgName,
+                                    replyFormat.formatter);
         (responseObject, ret) = formatters.unmarshall(replyFormat.formatter,
                                                       vc.content,
-						      oclass= responseClass)
+						      oclass=responseClass)
+        if (vc.content != 0) : IPC_freeByteArray(vc.content)
+    else : return (None, IPC_Error)
   except : print exc_info(); return (None, IPC_Error)
   return (responseObject, ret)
 
@@ -350,24 +385,26 @@ def IPC_printData (formatter, stream, data) :
 def IPC_readData (formatter, stream) :
   raise "IPC_readData: Not yet implemented"
 
-def addTimer (tdelay, count, handler, clientData) :
-  global timerHashTable, handlerIndex
+def addTimer (tdelay, count, handler, clientData, timerRef) :
+  global timerHashTable, handlerNumber
 
-  handlerIndex = handlerIndex + 1
-  timerRef = TIMER_REF_CONTAINER_TYPE()
-  retval = addTimerGetRef(tdelay, count, handlerIndex, timerRef)
+  handlerNumber = handlerNumber + 1
+  if (timerRef == None) : timerRef = TIMER_REF_CONTAINER_TYPE()
+  retval = addTimerGetRef(tdelay, count, handlerNumber, timerRef)
   if (retval == IPC_OK) :
-    timerHashTable[handler] = handlerIndex
-    timerHashTable[handlerIndex] = (handler, clientData, timerRef.timerRef)
-    return (timerRef.timerRef, retval)
-  else : return (None, retval)
+    timerHashTable[handler] = handlerNumber
+    timerHashTable[handlerNumber] = (handler, clientData, timerRef.timerRef)
+    return retval
+  else : 
+    timerRef.ref = None
+    return retval
 
-def removeTimer (handlerIndex) :
+def removeTimer (handlerNumber) :
   global timerHashTable
-  del timerHashTable[timerHashTable[handlerIndex][0]]
-  del timerHashTable[handlerIndex]
+  del timerHashTable[timerHashTable[handlerNumber][0]]
+  del timerHashTable[handlerNumber]
 
-def IPC_addTimer (tdelay, count, handler, clientData) :
+def IPC_addTimer (tdelay, count, handler, clientData=None) :
   global timerHashTable
 
   # Replace existing timer, if needed
@@ -376,17 +413,15 @@ def IPC_addTimer (tdelay, count, handler, clientData) :
     removeTimer(hndIndex)
     print "Replacing existing timer for handler", handler.__name__
   except: pass
+  return addTimer(tdelay, count, handler, clientData, None)
 
-  (timerRef, retval) = addTimer(tdelay, count, handler, clientData)
-  return retval
+def IPC_addTimerGetRef (tdelay, count, handler, clientData, timerRef) :
+  return addTimer(tdelay, count, handler, clientData, timerRef)
 
-def IPC_addTimerGetRef (tdelay, count, handler, clientData) :
-  return addTimer(tdelay, count, handler, clientData)
-
-def IPC_addOneShotTimer (tdelay, handler, clientData) :
+def IPC_addOneShotTimer (tdelay, handler, clientData=None) :
   return IPC_addTimer(tdelay, 1, handler, clientData)
 
-def IPC_addPeriodicTimer (tdelay, handler, clientData) :
+def IPC_addPeriodicTimer (tdelay, handler, clientData=None) :
   return IPC_addTimer(tdelay, TRIGGER_FOREVER, handler, clientData)
 
 def IPC_removeTimer (handler) :
@@ -406,29 +441,36 @@ def IPC_removeTimerByRef (timerRef) :
   for hndIndex in timerHashTable :
     if (isinstance(hndIndex, int)) :
       timerData = timerHashTable[hndIndex]
-      if (timerData[2] == timerRef) :
+      if (timerData[2] == timerRef.timerRef) :
         _IPC.IPC_removeTimerByRef(timerData[2])
         removeTimer(hndIndex)
         return IPC_OK  
   # No matching timerRef found 
-  print "Timer with ref %s does not exist" % timerRef
+  print "Timer with ref (%s) does not exist" % timerRef.timerRef
   return IPC_OK
 
+def getMsgClass (msgName, formatter) :
+  if (formatter == None) : return None
+  else :
+    try : return msgClassHashTable[msgName]
+    except :
+      print "WARNING: Missing class associated with message %s" % msgName
+      return None
+    
 def msgCallbackHandler (msgInstance, byteArray, key) :
   global msgHashTable
-  try :
-    handlerData = msgHashTable[key]
+  try : handlerData = msgHashTable[key]
   except : 
     print "Ooops -- no handler for %s" % IPC_msgInstanceName(msgInstance)
     handlerData = None
 
   if (not handlerData is None) :
     try: 
-      if (handlerData[3]) : # Auto-unmarshall
-        try :
-          (data, retval) = \
-             formatters.unmarshall(IPC_msgInstanceFormatter(msgInstance),
-                                   byteArray, None, handlerData[2])
+      if (handlerData[2]) : # Auto-unmarshall
+        formatter = IPC_msgInstanceFormatter(msgInstance)
+        oclass = getMsgClass(IPC_msgInstanceName(msgInstance), formatter)
+        try :(data, retval) =  formatters.unmarshall(formatter, \
+                                                     byteArray, None, oclass)
         except : retval = IPC_Error
         if (retval != IPC_OK) : raise "msgCallbackHandler: unmarshall failed"
         handlerData[0](msgInstance, data, handlerData[1])
@@ -442,8 +484,7 @@ def msgCallbackHandler (msgInstance, byteArray, key) :
 
 def queryCallbackHandler (msgInstance, byteArray, key) :
   global queryHashTable
-  try :
-    handlerData = queryHashTable[key]
+  try : handlerData = queryHashTable[key]
   except : 
     print "Ooops -- no query notification handler for %s" % \
           IPC_msgInstanceName(msgInstance)
@@ -452,9 +493,11 @@ def queryCallbackHandler (msgInstance, byteArray, key) :
   if (not handlerData is None) :
     del queryHashTable[key]
     try: 
-      if (handlerData[3]) : # Auto-unmarshall
-        try : (data, retval) = formatters.unmarshall(IPC_msgInstanceFormatter(msgInstance),
-                                                     byteArray, handlerData[2])
+      if (handlerData[2]) : # Auto-unmarshall
+        formatter = IPC_msgInstanceFormatter(msgInstance)
+        oclass = getMsgClass(IPC_msgInstanceName(msgInstance), formatter)
+        try :(data, retval) =  formatters.unmarshall(formatter, \
+                                                     byteArray, None, oclass)
         except : retval = IPC_Error
         if (retval != IPC_OK) : raise "queryCallbackHandler: unmarshall failed"
         handlerData[0](msgInstance, data, handlerData[1])

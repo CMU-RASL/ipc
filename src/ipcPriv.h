@@ -15,6 +15,27 @@
  * REVISION HISTORY
  *
  * $Log: ipcPriv.h,v $
+ * Revision 2.46  2013/11/22 16:57:30  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
+ * Revision 2.45  2013/09/22 21:20:40  reids
+ * Fixed bugs related to race conditions in setting global variables, and
+ * calling "waitUntilReady" multiple times.
+ *
+ * Revision 2.44  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
+ * Revision 2.43  2012/02/27 16:55:46  reids
+ * Fixed some problems with python and significantly improved transfer of arrays to/from python
+ *
  * Revision 2.42  2011/08/16 16:01:56  reids
  * Adding Python interface to IPC, plus some minor bug fixes
  *
@@ -373,10 +394,10 @@
 
 /* Interal version control */
 #define IPC_VERSION_MAJOR  3
-#define IPC_VERSION_MINOR  9
-#define IPC_VERSION_MICRO  1
-#define IPC_VERSION_DATE "Aug-16-11"
-#define IPC_COMMIT_DATE "$Date: 2011/08/16 16:01:56 $"
+#define IPC_VERSION_MINOR  10
+#define IPC_VERSION_MICRO  2
+#define IPC_VERSION_DATE "Nov-22-13"
+#define IPC_COMMIT_DATE "$Date: 2013/11/22 16:57:30 $"
 
 #define MAX_RECONNECT_TRIES (5)
 #define RECONNECT_WAIT      (1) /* seconds */
@@ -403,8 +424,8 @@
 typedef struct { BOOLEAN handled;
 		 void *data;
 		 FORMATTER_PTR formatter;
+                 const char *msgName; // Added 7/13 -- needed for Java port
 	       } QUERY_REPLY_TYPE, *QUERY_REPLY_PTR;
-
 
 typedef struct { 
   CONNECT_HANDLE_TYPE handler; 
@@ -430,13 +451,11 @@ extern IPC_VERBOSITY_TYPE ipcVerbosity;
 #ifdef macintosh
 #pragma export on
 #endif
-extern IPC_RETURN_TYPE _IPC_initialize (BOOLEAN isLispModule);
 
 /* Modified by TNgo, 5/22/97 */
 extern IPC_RETURN_TYPE _IPC_connect (const char *taskName,
 				     const char *serverName,
-				     BOOLEAN willListen,
-				     BOOLEAN isLispModule);
+				     BOOLEAN willListen);
 
 extern IPC_RETURN_TYPE _IPC_subscribe (const char *msgName, const char *hndName,
 				       HANDLER_TYPE handler, void *clientData,
@@ -468,7 +487,8 @@ extern IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName,
 					   unsigned int length,
 					   BYTE_ARRAY content,
 					   BYTE_ARRAY *replyHandle,
-					   FORMATTER_PTR *replyFormatter,
+					   FORMATTER_PTR *replyFormatterPtr,
+					   const char **responseMsgNamePtr,
 					   unsigned int timeoutMsecs);
 #ifdef macintosh
 #pragma export off

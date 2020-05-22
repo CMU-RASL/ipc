@@ -18,6 +18,9 @@
  * REVISION HISTORY
  *
  * $Log: tcaInternal.h,v $
+ * Revision 2.10  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.9  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -672,8 +675,8 @@
  *    Dec-89 Christopher Fedor, School of Computer Science, CMU
  * Created.
  *
- * $Revision: 2.9 $
- * $Date: 2009/01/12 15:54:57 $
+ * $Revision: 2.10 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -687,7 +690,7 @@
 #define X_IPC_VERSION_MINOR      5
 #define X_IPC_VERSION_MICRO  8
 #define X_IPC_VERSION_DATE "Apr-24-96"
-#define X_IPC_COMMIT_DATE "$Date: 2009/01/12 15:54:57 $"
+#define X_IPC_COMMIT_DATE "$Date: 2013/07/23 21:13:39 $"
 #else
 #ifdef DOS_FILE_NAMES
 #include "formatte.h"
@@ -853,7 +856,6 @@ typedef struct _HND {
   HND_DATA_PTR hndData;
   struct _LIST *msgList;
   struct _RESOURCE *resource;
-  HND_LANGUAGE_ENUM hndLanguage;
 #ifdef NMP_IPC
   void *clientData;
   BOOLEAN autoUnmarshall;
@@ -990,13 +992,6 @@ typedef struct { int32 num; /* Number of handlers working on the multi-query */
 #define NO_REF -1
 #define CREATE_NULL_REF() x_ipcRefCreate((MSG_PTR)NULL, \
 				       (const char *)NULL, NO_REF)
-
-#ifdef LISP
-#define FLUSH_IF_NEEDED(stream) \
-{ LOCK_M_MUTEX; if (IS_LISP_MODULE()) fflush(stream); UNLOCK_M_MUTEX; }
-#else /* !LISP */
-#define FLUSH_IF_NEEDED(stream) 
-#endif /* !LISP */
 
 #ifndef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)

@@ -1,7 +1,7 @@
 #############################################################################
-#       $Id: GNUmakefile,v 2.11 2011/08/16 16:00:06 reids Exp $
-# $Revision: 2.11 $
-#     $Date: 2011/08/16 16:00:06 $
+#       $Id: GNUmakefile,v 2.14 2013/07/24 20:01:01 reids Exp $
+# $Revision: 2.14 $
+#     $Date: 2013/07/24 20:01:01 $
 #   $Author: reids $
 #    $State: Exp $
 #   $Locker:  $
@@ -26,6 +26,15 @@
 # HISTORY:
 #
 # $Log: GNUmakefile,v $
+# Revision 2.14  2013/07/24 20:01:01  reids
+# Updating lisp, java, python test programs to adhere to updated API
+#
+# Revision 2.13  2013/07/23 21:14:25  reids
+# Made API (relatively) consistent between all languages; added multi-language test procedures
+#
+# Revision 2.12  2012/02/27 16:55:46  reids
+# Fixed some problems with python and significantly improved transfer of arrays to/from python
+#
 # Revision 2.11  2011/08/16 16:00:06  reids
 # Adding Python test programs
 #
@@ -151,7 +160,7 @@ ifeq ($(shell uname),CYGWIN32_NT)
 DEFINES		+= -D_WINSOCK_
 endif
 
-LIBRARIES +=  -lpthread
+LIBRARIES +=  -lpthread -lm
 
 INC_PATH += -I../src
 VX_INC   += -I../src
@@ -212,6 +221,11 @@ ifdef THREADED
 LIBRARIES += -lpthread
 endif
 
+ifdef USE_32
+CFLAGS		+= -m32
+LD_SHARED	+= -melf_i386
+endif
+
 ifneq ($(THIS_OS),vxworks)
 $(BDIR)/sizesTest: $(ODIR)/sizesTest.o $(LIBDEP)
 	$(LINK.c) -o $@ $(ODIR)/sizesTest.o $(LIBRARIES) $(DYN_LIBRARIES)
@@ -254,7 +268,7 @@ endif
 
 ifneq ($(THIS_OS),vxworks)
 $(BDIR)/latency1: $(ODIR)/latency1.o $(LIBDEP)
-	$(LINK.c) -o $@ $(ODIR)/latency1.o $(LIBRARIES) $(DYN_LIBRARIES) -lm
+	$(LINK.c) -o $@ $(ODIR)/latency1.o $(LIBRARIES) $(DYN_LIBRARIES)
 else
 $(BDIR)/latency1: $(VODIR)/latency1.o
 	$(LINK.vx) -o $@ $(VODIR)/latency1.o
@@ -302,7 +316,7 @@ endif
 
 ifneq ($(THIS_OS),vxworks)
 $(BDIR)/marshallTest: $(ODIR)/marshallTest.o $(LIBDEP)
-	$(LINK.c) -o $@ $(ODIR)/marshallTest.o $(LIBRARIES) $(DYN_LIBRARIES) -lm
+	$(LINK.c) -o $@ $(ODIR)/marshallTest.o $(LIBRARIES) $(DYN_LIBRARIES)
 else
 $(BDIR)/marshallTest: $(VODIR)/marshallTest.o
 	$(LINK.vx) -o $@ $(VODIR)/marshallTest.o
@@ -336,19 +350,23 @@ $(BDIR)/multiTest: $(ODIR)/multiTest.o $(LIBDEP)
 	$(LINK.c) -o $@ $(ODIR)/multiTest.o $(LIBRARIES) -lpthread \
 	$(DYN_LIBRARIES)
 
+bigarray: $(ODIR)/bigarray.o $(LIBDEP)
+	$(LINK.c) -o $@ $(ODIR)/bigarray.o $(LIBRARIES) -lpthread \
+	$(DYN_LIBRARIES)
+
 IPC_CLASS_ROOT = ../java/build
 IPC_CLASS_FILE = $(IPC_CLASS_ROOT)/ipc/java/IPC.class
 
-ipcTest1j : ipcTest1.java $(IPC_CLASS_FILE) ../java/ipcjava.c
+ipcTest1j : ipcTest1.java $(IPC_CLASS_FILE) ../java/ipcJava.c
 	javac -classpath .:$(IPC_CLASS_ROOT) ipcTest1.java
 
-module1j : module.java module1.java $(IPC_CLASS_FILE) ../java/ipcjava.c
+module1j : module.java module1.java $(IPC_CLASS_FILE) ../java/ipcJava.c
 	javac -classpath .:$(IPC_CLASS_ROOT) module1.java
 
-module2j : module.java module2.java $(IPC_CLASS_FILE) ../java/ipcjava.c
+module2j : module.java module2.java $(IPC_CLASS_FILE) ../java/ipcJava.c
 	javac -classpath .:$(IPC_CLASS_ROOT) module2.java
 
-module3j : module.java module3.java $(IPC_CLASS_FILE) ../java/ipcjava.c
+module3j : module.java module3.java $(IPC_CLASS_FILE) ../java/ipcJava.c
 	javac -classpath .:$(IPC_CLASS_ROOT) module3.java
 
 $(BDIR)/ipcTest1j : ipcTest1j

@@ -9,9 +9,9 @@
  *              Liberally adapted by Reid from initial work by 
  *              Trey Smith and Nathaniel Fairfield
  *
- *       $Id: IPC.i,v 1.1 2011/08/16 16:00:36 reids Exp $
- * $Revision: 1.1 $
- *     $Date: 2011/08/16 16:00:36 $
+ *       $Id: IPC.i,v 1.3 2013/07/23 21:12:24 reids Exp $
+ * $Revision: 1.3 $
+ *     $Date: 2013/07/23 21:12:24 $
  *   $Author: reids $
  *    $State: Exp $
  *   $Locker:  $
@@ -22,6 +22,12 @@
  *
  * REVISION HISTORY
  * $Log: IPC.i,v $
+ * Revision 1.3  2013/07/23 21:12:24  reids
+ * Minor editing and bug fix
+ *
+ * Revision 1.2  2012/02/27 16:55:46  reids
+ * Fixed some problems with python and significantly improved transfer of arrays to/from python
+ *
  * Revision 1.1  2011/08/16 16:00:36  reids
  * Adding Python interface to IPC
  *
@@ -92,6 +98,7 @@ extern void SWIG_init(void); // To prevent compiler from complaining
 %ignore IPC_addOneShotTimer;
 %ignore IPC_addPeriodicTimer;
 %ignore IPC_removeTimer;
+%ignore x_ipcRegisterExitProc;
 
 %include "ipc.h"
 
@@ -100,8 +107,6 @@ import formatters
 from formatters import IPCdata
 from sys import exc_info
 }
-
-%ignore x_ipcRegisterExitProc;
 
 #define DEFINE_FOR_SWIG
 #define NEED_DEBUGGING

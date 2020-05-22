@@ -20,6 +20,17 @@
  * REVISION HISTORY
  *
  * $Log: dispatch.c,v $
+ * Revision 2.6  2013/11/22 16:57:29  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
  * Revision 2.5  2009/01/12 15:54:56  reids
  * Added BSD Open Source license info
  *
@@ -344,8 +355,8 @@
  * 20-Mar-89 Christopher Fedor, School of Computer Science, CMU
  * created
  *
- * $Revision: 2.5 $
- * $Date: 2009/01/12 15:54:56 $
+ * $Revision: 2.6 $
+ * $Date: 2013/11/22 16:57:29 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -1064,9 +1075,13 @@ void deliverDispatch(DISPATCH_PTR dispatch)
   if (dispatch->des == GET_S_GLOBAL(x_ipcServerModGlobal)) {
     if (monitorClass(dispatch->msg->msgData->msg_class)) {
       data = dispatch->classData;
-    } else {
+    } else if (dispatch->hnd->autoUnmarshall) {
       data = (char *)x_ipc_dataMsgDecodeMsg(dispatch->msg->msgData->msgFormat, 
-				      DISPATCH_MSG_DATA(dispatch),TRUE);
+					    DISPATCH_MSG_DATA(dispatch),TRUE);
+    } else {
+      data = DISPATCH_MSG_DATA(dispatch)->msgData;
+      // Don't free data automatically
+      DISPATCH_MSG_DATA(dispatch)->dataStruct = data; 
     }
     (*dispatch->hnd->hndProc)(dispatch, data);
     if (dispatch->msg_class == InformClass) {
@@ -1198,6 +1213,43 @@ X_IPC_RETURN_VALUE_TYPE centralNullReply(DISPATCH_PTR dispatch)
 
 /******************************************************************************
  *
+ * FUNCTION: void centralReplyRaw(dispatch, data, len)
+ *
+ * DESCRIPTION: allows central to reply like a module.
+ *              data is just an array of "len" bytes
+ *              Easiest way to implement in current system is to pretend 
+ *                the format is fixed length
+ *
+ * INPUTS: 
+ * DISPATCH_PTR dispatch;
+ * void *data; int32 len
+ *
+ * OUTPUTS: void
+ *
+ *****************************************************************************/
+
+static FORMAT_TYPE createFixedFormat (int32 len)
+{
+  FORMAT_TYPE fixedFormat;
+  fixedFormat.type = LengthFMT; fixedFormat.formatter.i = len;
+  fixedFormat.flatBufferSize = len;
+  return fixedFormat;
+}
+
+X_IPC_RETURN_VALUE_TYPE centralReplyRaw(DISPATCH_PTR dispatch,
+					const void *data, int32 len)
+{
+  FORMAT_TYPE fixedFormat = createFixedFormat(len), *realFormat;
+
+  realFormat = (FORMAT_PTR)dispatch->msg->msgData->resFormat;
+  dispatch->msg->msgData->resFormat = &fixedFormat;
+  X_IPC_RETURN_VALUE_TYPE retVal = centralReply(dispatch, data);
+  dispatch->msg->msgData->resFormat = realFormat;
+  return retVal;
+}
+
+/******************************************************************************
+ *
  * FUNCTION: X_IPC_RETURN_VALUE_TYPE centralInform(name, data)
  *
  * DESCRIPTION:
@@ -1249,6 +1301,41 @@ X_IPC_RETURN_VALUE_TYPE centralBroadcast(const char *name, const void *data)
 			      (char *)data, (char *)NULL);
   else
     return Success;
+}
+
+
+/******************************************************************************
+ *
+ * FUNCTION: X_IPC_RETURN_VALUE_TYPE centralBroadcastRaw(name, data, len)
+ *
+ * DESCRIPTION: data is just an array of "len" bytes
+ *              Easiest way to implement in current system is to pretend 
+ *                the format is fixed length
+ *
+ * INPUTS: const char *name;
+ *         void *data; int32 len;
+ *
+ * OUTPUTS: X_IPC_RETURN_VALUE_TYPE
+ *
+ *****************************************************************************/
+
+X_IPC_RETURN_VALUE_TYPE centralBroadcastRaw(const char *name,
+					    const void *data, int32 len)
+{ 
+  MSG_PTR msg;
+  FORMAT_TYPE fixedFormat = createFixedFormat(len), *realFormat;
+  X_IPC_RETURN_VALUE_TYPE retVal;
+  
+  msg = x_ipc_msgFind(name);
+  if (msg == NULL) return MsgUndefined;
+  x_ipc_checkMessageClass(msg, BroadcastClass);
+  
+  realFormat = (FORMAT_PTR)msg->msgData->msgFormat;
+  msg->msgData->msgFormat = &fixedFormat;
+  retVal = centralSendMessage((X_IPC_REF_PTR)NULL, msg,
+			      (char *)data, (char *)NULL);
+  msg->msgData->msgFormat = realFormat;
+  return retVal;
 }
 
 

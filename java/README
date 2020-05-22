@@ -1,22 +1,22 @@
-The Java version of IPC has currently been tested only under Linux
-(specifically RedHat 6.2, RedHat 7.0 and 7.1, Mandrake 8.1) and Solaris.
+The Java version of IPC has currently been tested only under Linux.
 
-To make IPC for Java on your system, you may need to edit the GNUmakefile,
-changing the location of the include files to point to your Java installation.
-In particular, search for the occurrences of INC_PATH in the GNUmakefile in
-this directory, and replace the appropriate lines so that the compiler can
-find jni.h and jni_md.h
+To make IPC for Java on your system, you will need SWIG (currently tested
+using version 2.0.8).  With SWIG installed, you just type "gmake install"
+and everything should happen automatically.  After editing the GNUmakefile,
+just type "gmake install" and everything should happen automatically.
+After completing, you should have a number of classes in this directory,
+and libipcjava.so in the ../lib/<sys> directory (where <sys> is Linux, for
+instance).
 
-After editing the GNUmakefile, just type "gmake install" and everything
-should happen automatically (actually, you need to do a "gmake install" in
-the ipc/src directory first, in order to make libipc.a).  After completing,
-you should have a number of classes in this directory, and libipcjava.so in
-the ../lib/<sys> directory (where <sys> is Linux, for instance).
+You may need to edit the GNUmakefile, changing the location of the include
+files to point to your Java installation.  In particular, search for the
+occurrences of INC_PATH in the GNUmakefile in this directory, and replace
+the appropriate lines so that the compiler can find jni.h and jni_md.h).
 
-For some compilers, you may need to edit ipc/src/GNUmakefile to uncomment
-the USE_JAVA line.  You will know you have to do this if, when doing a
-"make" in the java directory, it complains about needing to recompile using
--fPIC.
+For some compilers, you may need to edit ipc/src/GNUmakefile to comment out
+the line following the "ifdef USE_JAVA" line.  You will know you have to do
+this if, when doing a "make" in the java directory, it complains about having
+compiled using -fPIC.
 
 To run the Java IPC, you need to set the LD_LIBRARY_PATH environment
 variable to include the directory where libipcjava.so is found (see above).
@@ -31,7 +31,8 @@ complete instructions.
 
 Reid Simmons
 Carnegie Mellon University
-February 12, 2003
+created: February 12, 2003
+updated to use SWIG: July, 2013
 
 Copyright (c) 2008, Carnegie Mellon University
     This software is distributed under the terms of the 

@@ -20,6 +20,17 @@
  * REVISION HISTORY
  *
  * $Log: sendMsg.c,v $
+ * Revision 2.10  2013/11/22 16:57:30  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
  * Revision 2.9  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -330,8 +341,8 @@
  *  7-May-90 Christopher Fedor, School of Computer Science, CMU
  * Created.
  *
- * $Revision: 2.9 $
- * $Date: 2009/01/12 15:54:57 $
+ * $Revision: 2.10 $
+ * $Date: 2013/11/22 16:57:30 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -404,13 +415,7 @@ X_IPC_RETURN_VALUE_TYPE x_ipc_sendMessage(X_IPC_REF_PTR ref, MSG_PTR msg,
 		msg->msgData->name);
     return Failure;
   }
-  if (!msg->direct || !msg->directList || msg->directList->numHandlers == 0) {
-    msgDataMsg->intent = msg->msgData->refId;
-    LOCK_CM_MUTEX;
-    sd = GET_C_GLOBAL(serverWrite);
-    UNLOCK_CM_MUTEX;
-    result = x_ipc_dataMsgSend(sd, msgDataMsg);
-  } else {
+  if (msg->direct && msg->directList) {
     /* Send in reverse order (to match what happens within central) */
     for (i=msg->directList->numHandlers-1, result=StatOK;
 	 i>=0 && result == StatOK; i--) {
@@ -431,6 +436,12 @@ X_IPC_RETURN_VALUE_TYPE x_ipc_sendMessage(X_IPC_REF_PTR ref, MSG_PTR msg,
 	}
       }
     }
+  } else {
+    msgDataMsg->intent = msg->msgData->refId;
+    LOCK_CM_MUTEX;
+    sd = GET_C_GLOBAL(serverWrite);
+    UNLOCK_CM_MUTEX;
+    result = x_ipc_dataMsgSend(sd, msgDataMsg);
   }
 
   x_ipc_dataMsgFree(msgDataMsg);

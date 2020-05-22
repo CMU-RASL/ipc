@@ -11,8 +11,8 @@
  * ABSTRACT:
  *
  * $Source: /afs/cs.cmu.edu/project/TCA/Master/ipc/src/basics.h,v $ 
- * $Revision: 2.4 $
- * $Date: 2009/01/12 15:54:55 $
+ * $Revision: 2.5 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -22,6 +22,9 @@
  * REVISION HISTORY:
  *
  * $Log: basics.h,v $
+ * Revision 2.5  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.4  2009/01/12 15:54:55  reids
  * Added BSD Open Source license info
  *
@@ -192,12 +195,6 @@
 #define INCbasics
 
 #define NMP_IPC
-
-/* This is needed because the current version of Lispworks for VxWorks
-   is not able to call Lisp function from C */
-#if defined(LISPWORKS) && defined(VXWORKS)
-#define LISPWORKS_FFI_HACK
-#endif
 
 /* GCC supports inlining of functions.*/
 #if defined(__GNUC__) && !defined(__NeXT__)

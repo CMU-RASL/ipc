@@ -14,8 +14,8 @@
  * x_ipc behavior level.
  *
  * $Source: /afs/cs.cmu.edu/project/TCA/Master/ipc/src/behaviors.h,v $ 
- * $Revision: 2.4 $
- * $Date: 2009/01/12 15:54:55 $
+ * $Revision: 2.6 $
+ * $Date: 2013/11/22 16:57:29 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -25,6 +25,20 @@
  * REVISION HISTORY:
  *
  * $Log: behaviors.h,v $
+ * Revision 2.6  2013/11/22 16:57:29  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
+ * Revision 2.5  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.4  2009/01/12 15:54:55  reids
  * Added BSD Open Source license info
  *
@@ -212,11 +226,7 @@ X_IPC_RETURN_VALUE_TYPE x_ipcQueryCentral(const char *name,
 				      void *replyData);
 
 MSG_PTR x_ipc_msgFind2(const char *name, const char *hndName);
-
-X_IPC_RETURN_VALUE_TYPE _x_ipcQueryNotify(const char *name, void *query, 
-				      REPLY_HANDLER_FN replyHandler, 
-				      HND_LANGUAGE_ENUM language,
-				      void *clientData);
+MSG_PTR x_ipc_msgFind3(const char *name);
 
 #ifdef NMP_IPC
 /* Three-argument handler type, for NMP IPC */
@@ -236,7 +246,6 @@ char *ipcData (CONST_FORMAT_PTR formatter, char *data);
 X_IPC_RETURN_VALUE_TYPE x_ipc_queryNotifySend (MSG_PTR msg, const char *name,
 				       void *query,
 				       REPLY_HANDLER_FN replyHandler, 
-				       HND_LANGUAGE_ENUM language,
 				       void *clientData);
 
 /* Clean-up stuff to do when a handler has completed */

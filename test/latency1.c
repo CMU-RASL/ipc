@@ -10,8 +10,8 @@
  *           With a command line argument, indicates how many messages central
  *             can send at any one time.
  *
- * $Revision: 2.2 $
- * $Date: 2009/01/12 15:54:58 $
+ * $Revision: 2.3 $
+ * $Date: 2013/07/24 20:01:01 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -21,6 +21,9 @@
  * REVISION HISTORY
  *
  * $Log: latency1.c,v $
+ * Revision 2.3  2013/07/24 20:01:01  reids
+ * Updating lisp, java, python test programs to adhere to updated API
+ *
  * Revision 2.2  2009/01/12 15:54:58  reids
  * Added BSD Open Source license info
  *
@@ -96,13 +99,23 @@ static void MsgHnd (MSG_INSTANCE msgRef, void *data, void *ClientData)
   static double min = 1.0e10;
   static int msgCount = 0;  
   static struct timeval firstTime;
-  struct timeval now, *before;
+  struct timeval now, before;
   double diff, ave;
+//#define SENDING_INTS
+#ifdef SENDING_INTS // If sender using 32 bit machine
+  struct timeval_int {int sec, usec; };
+  struct timeval_int *before1;
+#endif
 
   gettimeofday(&now, NULL);
   msgCount++;
-  before = (struct timeval *)data;
-  diff = 1000*sslCalcTimevalDiff(&now, before);
+#ifdef SENDING_INTS
+  before1 = (struct timeval_int *)data;
+  before.tv_sec = before1->sec;  before.tv_usec = before1->usec;
+#else
+  before = *(struct timeval *)data;
+#endif
+  diff = 1000*sslCalcTimevalDiff(&now, &before);
   sum += diff;
   sumSq += diff*diff;
   if (diff > max) max = diff;
@@ -113,7 +126,7 @@ static void MsgHnd (MSG_INSTANCE msgRef, void *data, void *ClientData)
   } else if (msgCount == NSEND) {
     ave = sum/msgCount;
     diff = sslCalcTimevalDiff(&now, &firstTime);
-    printf("Latency for %d messages: Max: %.1f msecs, Min: %.1f, Mean: %.1f (%.1f), Std Dev: %.1f\n",
+    printf("Latency for %d messages: Max: %.2f msecs, Min: %.2f, Mean: %.2f (%.2f), Std Dev: %.2f\n",
 	   msgCount, max, min, ave, 1000*(diff/msgCount), 
 	   sqrt(sumSq/msgCount - (ave*ave)));
     msgCount = 0;

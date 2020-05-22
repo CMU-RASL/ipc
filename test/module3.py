@@ -11,8 +11,8 @@
 #                     Exits when 'q' is typed at terminal
 #                     Should be run in conjunction with module1 and module2
 #
-# $Revision: 2.1 $
-# $Date: 2011/08/16 16:00:10 $
+# $Revision: 2.2 $
+# $Date: 2013/07/24 20:01:01 $
 # $Author: reids $
 #
 # Copyright (c) 2008, Carnegie Mellon University
@@ -22,25 +22,29 @@
 # REVISION HISTORY
 #
 # $Log: module3.py,v $
+# Revision 2.2  2013/07/24 20:01:01  reids
+# Updating lisp, java, python test programs to adhere to updated API
+#
 # Revision 2.1  2011/08/16 16:00:10  reids
 # Adding Python test programs
 #
 ################################################################/
 
 import sys
+from primFmttrs import *
 import IPC
 from module import *
 
 def msg1Handler_3 (msgRef, callData, clientData) :
   (i1, ret) = IPC.IPC_unmarshallData(IPC.IPC_msgInstanceFormatter(msgRef),
-                                     callData)
+                                     callData, int)
   print "msg1Handler: Receiving %s (%d) [%s]" % \
         (IPC.IPC_msgInstanceName(msgRef), i1, clientData)
   IPC.IPC_freeByteArray(callData)
 
 def msg2Handler_3 (msgRef, callData, clientData) :
   (str1, ret) = IPC.IPC_unmarshallData(IPC.IPC_msgInstanceFormatter(msgRef),
-                                       callData)
+                                       callData, str)
   print "msg2Handler: Receiving %s (%s) [%s]" % \
         (IPC.IPC_msgInstanceName(msgRef), str1, clientData)
   IPC.IPC_freeByteArray(callData)

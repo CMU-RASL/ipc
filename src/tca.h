@@ -16,8 +16,8 @@
  *  Include File
  *
  * $Source: /afs/cs.cmu.edu/project/TCA/Master/ipc/src/tca.h,v $ 
- * $Revision: 2.5 $
- * $Date: 2009/01/12 15:54:57 $
+ * $Revision: 2.6 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -27,6 +27,9 @@
  * REVISION HISTORY:
  *
  * $Log: tca.h,v $
+ * Revision 2.6  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.5  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -529,15 +532,6 @@ typedef struct {
   int numOfRetries;		/* number of times of CNode being retried */
 } EXC_INFO_TYPE, * EXC_INFO_PTR;
 
-/* The language in which the message handler is written */
-typedef enum {
-  UNKNOWN_LANGUAGE=0, C_LANGUAGE=1, LISP_LANGUAGE=2,
-  RAW_C_LANGUAGE=3, RAW_LISP_LANGUAGE=4
-#ifdef FORCE_32BIT_ENUM
-    , dummyHndLanguageEnum = 0x7FFFFFFF
-#endif
-} HND_LANGUAGE_ENUM;
-
 /***************************************************************************/
 
 typedef enum {
@@ -686,13 +680,10 @@ IPC_EXTERN_FUNCTION( void x_ipcRegisterMessage,
 IPC_EXTERN_FUNCTION( void x_ipcPreloadMessage,
 		     (const char *name));
 
-IPC_EXTERN_FUNCTION( void _x_ipcRegisterHandlerL,
+IPC_EXTERN_FUNCTION( void x_ipcRegisterHandler,
 		     (const char *msgName, const char *hndName, 
-		      X_IPC_HND_FN hndProc, HND_LANGUAGE_ENUM hndLanguage));
+		      X_IPC_HND_FN hndProc));
 
-#define x_ipcRegisterHandler(msgName, hndName, hndProc) \
-_x_ipcRegisterHandlerL(msgName, hndName, (X_IPC_HND_FN) hndProc, C_LANGUAGE)
-     
 IPC_EXTERN_FUNCTION( void x_ipcDeregisterHandler,
 		     (const char *msgName, const char *hndName));
 

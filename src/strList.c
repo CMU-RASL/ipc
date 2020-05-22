@@ -40,6 +40,17 @@
  * REVISION HISTORY:
  *
  * $Log: strList.c,v $
+ * Revision 2.4  2013/11/22 16:57:30  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
  * Revision 2.3  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -137,8 +148,8 @@
  * x_ipcFreeData.
  *
  *
- * $Revision: 2.3 $
- * $Date: 2009/01/12 15:54:57 $
+ * $Revision: 2.4 $
+ * $Date: 2013/11/22 16:57:30 $
  * $Author: reids $
  *
  **************************************************************************/
@@ -252,16 +263,12 @@ void x_ipc_strListPush(const char *item, STR_LIST_PTR strList)
 void x_ipc_strListDBPush(const char* file, int line,
 		   const char *item, STR_LIST_PTR strList)
 {
-  STR_LIST_PTR element;
+  if (strList->length == strList->size)
+    strListIncrement(strList);
   
-  element = x_ipc_strListDBCreate(file,line);
-  element->item = (char *)item;
-  element->next = strList->next;
-
-  strList->next = element;
-
+  strList->strings[strList->length] = item;
+  strList->length++;
 }
-
 #else
 void x_ipc_strListDBPush(const char* file, int line,
 		   const char *item, STR_LIST_PTR strList)
@@ -547,7 +554,7 @@ STR_LIST_PTR x_ipc_strListDBCreate(const char* file, int line)
 {
   STR_LIST_PTR newList;
   
-  newList = x_ipcDBMalloc(file,line,sizeof(STR_LIST_TYPE));
+  newList = NEW(STR_LIST_TYPE);
   newList->length = newList->size = 0;
   newList->strings = NULL;
 

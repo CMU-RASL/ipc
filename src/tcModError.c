@@ -7,6 +7,9 @@
  *     Simplified BSD License (see ipc/LICENSE.TXT)
  *
  * $Log: tcModError.c,v $
+ * Revision 2.5  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.4  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -161,8 +164,8 @@
  * Revision 1.2  1993/05/19  17:26:09  fedor
  * Added Logging.
  *
- * $Revision: 2.4 $
- * $Date: 2009/01/12 15:54:57 $
+ * $Revision: 2.5 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *
  *
@@ -187,7 +190,7 @@ void x_ipcModWarning(const char *description, ...)
     va_start(args, description);
     vfprintf(stderr, (char *)description, args);
     va_end(args);
-    FLUSH_IF_NEEDED(stderr);
+    fflush(stderr);
   }
 }  
 
@@ -206,7 +209,7 @@ void x_ipcModError(const char *description, ...)
     vfprintf(stderr, (char *)description, args);
     fprintf(stderr, "\n");
     va_end(args);
-    FLUSH_IF_NEEDED(stderr);
+    fflush(stderr);
   }
   
 #ifdef NMP_IPC
@@ -217,20 +220,12 @@ void x_ipcModError(const char *description, ...)
   
     LOCK_M_MUTEX;
     if (mGlobalp()) {
-#ifdef LISP
-      if (IS_LISP_MODULE()) {
-	if (GET_M_GLOBAL(lispExitGlobal) != NULL)
-	  (*(GET_M_GLOBAL(lispExitGlobal)))();
-      } else
-#endif /* LISP */
-	{
-	  if (GET_M_GLOBAL(x_ipcExitHnd)) {
-	    (*(GET_M_GLOBAL(x_ipcExitHnd)))();
-	  } else {
-	    exit(-1);
-	  }
-	}
+      if (GET_M_GLOBAL(x_ipcExitHnd)) {
+	(*(GET_M_GLOBAL(x_ipcExitHnd)))();
+      } else {
+	exit(-1);
       }
+    }
     UNLOCK_M_MUTEX;
   }
 }

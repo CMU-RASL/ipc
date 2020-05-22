@@ -14,8 +14,8 @@
 ;;                       Exits when 'q' is typed at terminal
 ;;                       Should be run in conjunction with module1 and module2
 ;;
-;; $Revision: 2.2 $
-;; $Date: 2009/01/12 15:54:58 $
+;; $Revision: 2.3 $
+;; $Date: 2013/07/24 20:01:01 $
 ;; $Author: reids $
 ;;
 ;; Copyright (c) 2008, Carnegie Mellon University
@@ -25,6 +25,9 @@
 ;; REVISION HISTORY
 ;;
 ;; $Log: module3.lisp,v $
+;; Revision 2.3  2013/07/24 20:01:01  reids
+;; Updating lisp, java, python test programs to adhere to updated API
+;;
 ;; Revision 2.2  2009/01/12 15:54:58  reids
 ;; Added BSD Open Source license info
 ;;
@@ -51,19 +54,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;/
 
 ;;; Load the common file with all the type and name definitions
-(load (make-pathname :DIRECTORY (pathname-directory *LOAD-TRUENAME*)
-		     :NAME "module.lisp"))
+(eval-when (load eval)
+  (load (make-pathname :directory (pathname-directory *load-truename*)
+		       :name "module.lisp")))
 
 ;; This is copied from module2.c;  The "right" way to do it is to define
 ;;   it once, in a separate file, and link both modules with the same function
-(IPC:IPC_defun_handler msg1Handler (msgRef msg1Data clientData)
-  (format T "msg1Handler: Receiving ~s (~d) [~s]~%" 
+(defun msg1Handler (msgRef msg1Data clientData)
+  (format t "msg1Handler: Receiving ~s (~d) [~s]~%" 
 	  (IPC:IPC_msgInstanceName msgRef) msg1Data clientData))
 
 ;; This is copied from module1.c;  The "right" way to do it is to define
 ;;   it once, in a separate file, and link both modules with the same function
-(IPC:IPC_defun_handler msg2Handler (msgRef lispData clientData)
-  (format T "msg2Handler: Receiving ~s (~s) [~s]~%" 
+(defun msg2Handler (msgRef lispData clientData)
+  (format t "msg2Handler: Receiving ~s (~s) [~s]~%" 
 	  (IPC:IPC_msgInstanceName msgRef) lispData clientData))
 
 (defun stdinHnd (fd clientData)
@@ -74,26 +78,26 @@
        (IPC:IPC_disconnect)
        #+ALLEGRO (top-level:do-command "reset") #+LISPWORKS (abort)
        )
-      (T (format T "stdinHnd [~s]: Received ~s" clientData inputLine)))))
+      (T (format t "stdinHnd [~s]: Received ~s" clientData inputLine)))))
 
 (defun module3 ()
 
   ;; Connect to the central server
-  (format T "~%(IPC_connect ~s)~%" MODULE3_NAME)
+  (format t "~%(IPC_connect ~s)~%" MODULE3_NAME)
   (IPC:IPC_connect MODULE3_NAME)
 
   ;; Subscribe to the messages that this module listens to.
-  (format T "~%(IPC_subscribe ~s 'msg1Handler ~s)~%" MSG1 MODULE3_NAME)
+  (format t "~%(IPC_subscribe ~s 'msg1Handler ~s)~%" MSG1 MODULE3_NAME)
   (IPC:IPC_subscribe MSG1 'msg1Handler MODULE3_NAME)
 
-  (format T "~%(IPC_subscribe ~s 'msg2Handler ~s)~%" MSG2 MODULE3_NAME)
+  (format t "~%(IPC_subscribe ~s 'msg2Handler ~s)~%" MSG2 MODULE3_NAME)
   (IPC:IPC_subscribe MSG2 'msg2Handler MODULE3_NAME)
 
   ;; Subscribe a handler for tty input. Typing "q" will quit the program
-  (format T "~%(IPC_subscribeFD ~d 'stdinHnd ~s)~%" 0 MODULE3_NAME)
+  (format t "~%(IPC_subscribeFD ~d 'stdinHnd ~s)~%" 0 MODULE3_NAME)
   (IPC:IPC_subscribeFD 0 'stdinHnd MODULE3_NAME)
 
-  (format T "~%Type 'q' to quit~%")
+  (format t "~%Type 'q' to quit~%")
 
   (IPC:IPC_dispatch)
   )

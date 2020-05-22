@@ -15,8 +15,8 @@
 #                     Exits when 'q' is typed at terminal.
 #                     Should be run in conjunction with module1
 #
-# $Revision: 2.1 $
-# $Date: 2011/08/16 16:00:09 $
+# $Revision: 2.2 $
+# $Date: 2013/07/24 20:01:01 $
 # $Author: reids $
 #
 # Copyright (c) 2008, Carnegie Mellon University
@@ -26,12 +26,16 @@
 # REVISION HISTORY
 #
 # $Log: module2.py,v $
+# Revision 2.2  2013/07/24 20:01:01  reids
+# Updating lisp, java, python test programs to adhere to updated API
+#
 # Revision 2.1  2011/08/16 16:00:09  reids
 # Adding Python test programs
 #
 ################################################################/
 
 import sys
+from primFmttrs import *
 import IPC
 from module import *
 
@@ -88,6 +92,7 @@ def main () :
   print "\nIPC.IPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % \
         (RESPONSE1, RESPONSE1_FORMAT)
   IPC.IPC_defineMsg(RESPONSE1, IPC.IPC_VARIABLE_LENGTH, RESPONSE1_FORMAT)
+  IPC.IPC_msgClass(RESPONSE1, T2)
 
   # Subscribe to the messages that this module listens to
   print "\nIPC.IPC_subscribeData(%s,%s, %s)" % \
@@ -96,7 +101,7 @@ def main () :
 
   print "\nIPC.IPC_subscribeData(%s, %s, %s, %s)" % \
         (QUERY1 , queryHandler.__name__, MODULE2_NAME, T1.__name__)
-  IPC.IPC_subscribeData(QUERY1, queryHandler, MODULE2_NAME, T1)
+  IPC.IPC_subscribeData(QUERY1, queryHandler, MODULE2_NAME)
 
   # Subscribe a handler for tty input. Typing "q" will quit the program.
   print "\nIPC_subscribeFD(%d, stdinHnd, %s)" % \

@@ -8,9 +8,9 @@
  * ABSTRACT: C-headers for interfacing specifically with Python
  *           Used by SWIG (see ffi/IPC.i)
  *
- *       $Id: ipcPython.h,v 1.2 2011/08/17 00:47:04 reids Exp $
- * $Revision: 1.2 $
- *     $Date: 2011/08/17 00:47:04 $
+ *       $Id: ipcPython.h,v 1.4 2013/07/24 01:43:08 reids Exp $
+ * $Revision: 1.4 $
+ *     $Date: 2013/07/24 01:43:08 $
  *   $Author: reids $
  *    $State: Exp $
  *   $Locker:  $
@@ -21,6 +21,12 @@
  *
  * REVISION HISTORY
  * $Log: ipcPython.h,v $
+ * Revision 1.4  2013/07/24 01:43:08  reids
+ * A few bugs fixed for the 3.10.0 version
+ *
+ * Revision 1.3  2012/02/27 16:55:46  reids
+ * Fixed some problems with python and significantly improved transfer of arrays to/from python
+ *
  * Revision 1.2  2011/08/17 00:47:04  reids
  * Removed mention of IPC_freeData and IPC_freeDataElements.
  * Changed the signature of IPC_unmarshall.
@@ -34,7 +40,9 @@
 #define IPC_PYTHON_H
 
 // Needed for queryResponse, to pass back replyFormat
-typedef struct { FORMATTER_PTR formatter; } FORMATTER_CONTAINER_TYPE;
+typedef struct {
+  FORMATTER_PTR formatter;
+  char *msgName; } FORMATTER_CONTAINER_TYPE;
 // Needed for addTimerGetRef, to pass back timerRef
 typedef struct { TIMER_REF timerRef; } TIMER_REF_CONTAINER_TYPE;
 
@@ -66,5 +74,28 @@ IPC_RETURN_TYPE addTimerGetRef(unsigned long tdelay, long count,
 			       TIMER_REF_CONTAINER_TYPE *timerRef);
 
 void setExitProc (void);
+
+void encodeByteArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeByteArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeUByteArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeUByteArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeShortArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeShortArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeIntArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeIntArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeCharArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeCharArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeFloatArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeFloatArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeDoubleArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeDoubleArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeBooleanArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeBooleanArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeUShortArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeUShortArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeUIntArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeUIntArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void encodeLongArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
+void decodeLongArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer);
 
 #endif // IPC_PYTHON_H

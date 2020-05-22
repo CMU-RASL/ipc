@@ -20,6 +20,20 @@
  * REVISION HISTORY
  *
  * $Log: behaviors.c,v $
+ * Revision 2.14  2013/11/22 16:57:29  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
+ * Revision 2.13  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.12  2009/01/12 15:54:55  reids
  * Added BSD Open Source license info
  *
@@ -500,12 +514,13 @@
  *  1-Dec-88 Christopher Fedor, School of Computer Science, CMU
  * created message cache.
  *
- * $Revision: 2.12 $
- * $Date: 2009/01/12 15:54:55 $
+ * $Revision: 2.14 $
+ * $Date: 2013/11/22 16:57:29 $
  * $Author: reids $
  *
  *****************************************************************************/
 
+#include <assert.h>
 #include "globalM.h"
 #ifdef NMP_IPC
 #ifdef DOS_FILE_NAMES
@@ -727,6 +742,31 @@ MSG_PTR x_ipc_msgFind2(const char *name, const char *hndName)
   return msg;
 }
 
+/* Check whether a message has been registered. Don't cache the message
+ *   (less efficient, but eliminates some direct connection bugs)
+ */
+MSG_PTR x_ipc_msgFind3(const char *name)
+{
+  MSG_PTR msg;
+  MSG_DATA_PTR msgData;
+  MSG_ASK_TYPE msgAsk;
+  
+  LOCK_M_MUTEX;
+  msg = GET_MESSAGE(name);
+  UNLOCK_M_MUTEX;
+
+  if (!msg || msg->msgData->msg_class == HandlerRegClass) {
+    msgAsk.msgName = name;
+    msgAsk.hndName = NULL;
+    
+    if (x_ipcQueryCentral(X_IPC_MSG_INFO_QUERY, (void *)&msgAsk,
+			(void *)&msgData) != Success) {
+      return NULL;
+    }
+    return (!msgData || msgData->msg_class == HandlerRegClass ? NULL : msg);
+  }
+  return msg;
+}
 
 /******************************************************************************
  *
@@ -955,30 +995,6 @@ char *ipcData (CONST_FORMAT_PTR formatter, char *data)
 }
 #endif /* NMP_IPC */
 
-#ifdef LISPWORKS_FFI_HACK
-static void setExecHndState (X_IPC_REF_PTR x_ipcRef, const char* hndName,
-			     void *data, void *clientData,
-			     CONNECTION_PTR connection, MSG_PTR msg,
-			     int tmpParentRef)
-{
-  LOCK_CM_MUTEX;
-  if (GET_C_GLOBAL(execHndState).state != ExecHnd_Idle) {
-    X_IPC_MOD_ERROR("IPC for Lispworks on VxWorks cannot handle recursive calls to x_ipc_execHnd\n");
-  } else {
-    GET_C_GLOBAL(execHndState).state = ExecHnd_Pending;
-    GET_C_GLOBAL(execHndState).x_ipcRef = x_ipcRef;
-    GET_C_GLOBAL(execHndState).hndName = hndName;
-    GET_C_GLOBAL(execHndState).data = data;
-    GET_C_GLOBAL(execHndState).clientData = clientData;
-    GET_C_GLOBAL(execHndState).connection = connection;
-    GET_C_GLOBAL(execHndState).msg = msg;
-    GET_C_GLOBAL(execHndState).tmpParentRef = tmpParentRef;
-    GET_C_GLOBAL(execHndState).tmpResponse = tmpResponse;
-  }
-  UNLOCK_CM_MUTEX;
-}
-#endif /* LISPWORKS_FFI_HACK */
-
 /******************************************************************************
  *
  * FUNCTION: void x_ipc_execHnd(connection, dataMsg)
@@ -1003,10 +1019,7 @@ void x_ipc_execHnd(CONNECTION_PTR connection, DATA_MSG_PTR dataMsg)
   CLASS_FORM_PTR classForm;
   int tmpParentRef, byteOrder;
   X_IPC_CONTEXT_PTR currentContext;
-#ifdef LISPWORKS_FFI_HACK
-  BOOLEAN isLisp;
-#endif
-  
+
   /* RTG Don't really know what intent is, but trying to use it. */
   if (dataMsg->intent == QUERY_REPLY_INTENT) {
     X_IPC_MOD_WARNING("Warning: Unknown query reply\n");
@@ -1014,6 +1027,7 @@ void x_ipc_execHnd(CONNECTION_PTR connection, DATA_MSG_PTR dataMsg)
   } else {
     LOCK_CM_MUTEX;
     hnd = (HND_PTR)idTableItem(dataMsg->intent, GET_C_GLOBAL(hndIdTable));
+    GET_M_GLOBAL(attending)++;
     UNLOCK_CM_MUTEX;
   }
 
@@ -1055,8 +1069,8 @@ void x_ipc_execHnd(CONNECTION_PTR connection, DATA_MSG_PTR dataMsg)
   /* If the handler is *not* in the message list, it was probably deregistered 
      after central sent it the message */
   if (x_ipc_listMemberItem(hnd, msg->hndList)) {
-    data = (char *)x_ipc_decodeDataInLanguage(dataMsg, msg->msgData->msgFormat, 
-					hnd->hndLanguage);
+    data = (char *)x_ipc_dataMsgDecodeMsg(msg->msgData->msgFormat, dataMsg,
+					  FALSE);
     x_ipc_dataMsgFree(dataMsg);
     
     LOCK_CM_MUTEX;
@@ -1075,35 +1089,23 @@ void x_ipc_execHnd(CONNECTION_PTR connection, DATA_MSG_PTR dataMsg)
 	x_ipcRef->dataLength = ((IPC_VAR_DATA_PTR)data)->length;
       }
       data = ipcData(msg->msgData->msgFormat, data);
-#ifdef LISPWORKS_FFI_HACK
-      LOCK_M_MUTEX;
-      isLisp = IS_LISP_MODULE();
-      UNLOCK_M_MUTEX;
-      if (isLisp) {
-	/* LISPWORKS on VxWorks cannot call Lisp functions from C,
-	   so need this hack to handle incoming messages */
-	setExecHndState(x_ipcRef, hnd->hndData->hndName, data, hnd->clientData,
-			connection, msg, tmpParentRef);
-      } else
-#endif /* LISPWORKS_FFI_HACK */
-	{
-	  if (hnd->autoUnmarshall && msg->msgData->resFormat) {
-	    LOCK_M_MUTEX;
-	    byteOrder = GET_M_GLOBAL(byteOrder);
-	    UNLOCK_M_MUTEX;
-	      /* Skip if the data is simple -- already fully decoded */
-	    if (!(byteOrder == BYTE_ORDER && 
-		  x_ipc_sameFixedSizeDataBuffer(msg->msgData->resFormat))) {
-	      void *data1;
-	      IPC_unmarshall(msg->msgData->resFormat, data, &data1);
-	      IPC_freeByteArray(data);
-	      data = (char *)data1;
-	    }
-	  }
-	  (*((X_IPC_HND_DATA_FN)hnd->hndProc))(x_ipcRef, data, hnd->clientData);
-	  x_ipcSetContext(currentContext);
-	  endExecHandler(x_ipcRef, connection, msg, tmpParentRef);
+
+      if (hnd->autoUnmarshall && msg->msgData->resFormat) {
+	LOCK_M_MUTEX;
+	byteOrder = GET_M_GLOBAL(byteOrder);
+	UNLOCK_M_MUTEX;
+	/* Skip if the data is simple -- already fully decoded */
+	if (!(byteOrder == BYTE_ORDER && 
+	      x_ipc_sameFixedSizeDataBuffer(msg->msgData->resFormat))) {
+	  void *data1;
+	  IPC_unmarshall(msg->msgData->resFormat, data, &data1);
+	  IPC_freeByteArray(data);
+	  data = (char *)data1;
 	}
+      }
+      (*((X_IPC_HND_DATA_FN)hnd->hndProc))(x_ipcRef, data, hnd->clientData);
+      x_ipcSetContext(currentContext);
+      endExecHandler(x_ipcRef, connection, msg, tmpParentRef);
     }
 #else
     (*hnd->hndProc)(x_ipcRef, data);
@@ -1159,21 +1161,10 @@ void endExecHandler (X_IPC_REF_PTR x_ipcRef, CONNECTION_PTR connection,
   int sd = connection->readSd;
   BOOLEAN enableDistributed;
 
-#ifdef LISPWORKS_FFI_HACK
-  LOCK_CM_MUTEX;
-  if (IS_LISP_MODULE()) {
-    if (GET_C_GLOBAL(execHndState).state != ExecHnd_Handling) {
-      X_IPC_MOD_ERROR("endExecHandler: Not currently handling a message\n");
-      return;
-    } else {
-      GET_C_GLOBAL(execHndState).state = ExecHnd_Idle;
-    }
-  }
-  UNLOCK_CM_MUTEX;
-#endif /* LISPWORKS_FFI_HACK */
-
   /* If we have disconnected, then just return.  */
   LOCK_CM_MUTEX;
+  GET_M_GLOBAL(attending)--;
+  assert(GET_M_GLOBAL(attending) >= 0); /* Sanity check */
   if (!x_ipc_hashTableFind((void *)&sd, GET_C_GLOBAL(moduleConnectionTable))){
     UNLOCK_CM_MUTEX;
     return;
@@ -1430,11 +1421,6 @@ X_IPC_RETURN_VALUE_TYPE x_ipcQuerySend(const char *name,
 				  (char *)query, (char *)NULL, refId);
   
   *ref = x_ipcRefCreate(msg, name, refId);
-#ifdef LISP
-  LOCK_M_MUTEX;
-  GET_M_GLOBAL(lispRefSaveGlobal) = *ref;
-  UNLOCK_M_MUTEX;
-#endif /* LISP */
   
   return returnValue;
 }
@@ -1495,7 +1481,6 @@ X_IPC_RETURN_VALUE_TYPE x_ipcQueryReceive(X_IPC_REF_PTR ref, void *reply)
 X_IPC_RETURN_VALUE_TYPE x_ipc_queryNotifySend (MSG_PTR msg, const char *name,
 					       void *query,
 					       REPLY_HANDLER_FN replyHandler, 
-					       HND_LANGUAGE_ENUM language,
 					       void *clientData)
 {
   int32 refId;
@@ -1513,7 +1498,6 @@ X_IPC_RETURN_VALUE_TYPE x_ipc_queryNotifySend (MSG_PTR msg, const char *name,
   queryNotif = NEW(QUERY_NOTIFICATION_TYPE);
   queryNotif->ref = x_ipcRefCreate(msg, name, refId);
   queryNotif->handler = replyHandler;
-  queryNotif->language = language;
   queryNotif->clientData = clientData;
   LOCK_CM_MUTEX;
   x_ipc_listInsertItem((void *)queryNotif, GET_C_GLOBAL(queryNotificationList));
@@ -1533,24 +1517,16 @@ X_IPC_RETURN_VALUE_TYPE x_ipc_queryNotifySend (MSG_PTR msg, const char *name,
 }
 
 #ifndef NMP_IPC
-X_IPC_RETURN_VALUE_TYPE _x_ipcQueryNotify(const char *name, void *query, 
-				      REPLY_HANDLER_FN replyHandler, 
-				      HND_LANGUAGE_ENUM language,
-				      void *clientData)
+X_IPC_RETURN_VALUE_TYPE x_ipcQueryNotify(const char *name, void *query, 
+					 REPLY_HANDLER_FN replyHandler, 
+					 void *clientData)
 {
   MSG_PTR msg;
  
   msg = x_ipc_msgFind(name);
   if (msg == NULL) return MsgUndefined;
   x_ipc_checkMessageClass(msg, QueryClass);
-  return x_ipc_queryNotifySend(msg, name, query, replyHandler, language, clientData);
-}
-
-X_IPC_RETURN_VALUE_TYPE x_ipcQueryNotify(const char *name, void *query, 
-				     REPLY_HANDLER_FN replyHandler, 
-				     void *clientData)
-{
-  return _x_ipcQueryNotify(name, query, replyHandler, C_LANGUAGE, clientData);
+  return x_ipc_queryNotifySend(msg, name, query, replyHandler, clientData);
 }
 #endif
 
@@ -2008,11 +1984,6 @@ X_IPC_RETURN_VALUE_TYPE x_ipcMultiQuery(const char *name, void *query, int32 max
 				  (char *)&multiQueryClassData, refId);
   
   *refPtr = x_ipcRefCreate(msg, name, refId);
-#ifdef LISP
-  LOCK_CM_MUTEX;
-  GET_M_GLOBAL(lispRefSaveGlobal) = *refPtr;
-  UNLOCK_CM_MUTEX;
-#endif /* LISP */
   
   return returnValue;
 }

@@ -18,6 +18,9 @@
  * REVISION HISTORY
  *
  * $Log: tcaRef.c,v $
+ * Revision 2.6  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.5  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -228,8 +231,8 @@
  * 13-Aug-90 Christopher Fedor, School of Computer Science, CMU
  * created.
  *
- * $Revision: 2.5 $
- * $Date: 2009/01/12 15:54:57 $
+ * $Revision: 2.6 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -334,6 +337,16 @@ void x_ipcReferenceRelease(X_IPC_REF_PTR ref)
 
 const char *x_ipcReferenceName(X_IPC_REF_PTR ref)
 {
+  if (ref->msg != NULL && ref->msg->msgData != NULL &&
+      ref->msg->msgData->name != NULL) {
+    // Sanity check
+    if (strcmp(ref->msg->msgData->name, ref->name) != 0)
+      X_IPC_MOD_ERROR2("ERROR: x_ipcReferenceName: message and ref names differ: %s %s\n",
+		       ref->msg->msgData->name, ref->name);
+    // This is a stable version of the name -- the ref->name gets freed when
+    // the reference is deleted
+    return ref->msg->msgData->name;
+  }
   if (ref->name == NULL) {
     X_IPC_MOD_ERROR("ERROR: x_ipcReferenceName: invalid x_ipc reference pointer.\n");
     return NULL;

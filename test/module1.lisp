@@ -1,4 +1,4 @@
-/;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; PROJECT: New Millennium, DS1
 ;;          IPC (Interprocess Communication) Package
 ;;
@@ -14,8 +14,8 @@
 ;;                       Quits the program when a 'q' is typed.
 ;;                       Should be run in conjunction with module2.
 ;;
-;; $Revision: 2.2 $
-;; $Date: 2009/01/12 15:54:58 $
+;; $Revision: 2.3 $
+;; $Date: 2013/07/24 20:01:01 $
 ;; $Author: reids $
 ;;
 ;; Copyright (c) 2008, Carnegie Mellon University
@@ -25,6 +25,9 @@
 ;; REVISION HISTORY
 ;;
 ;; $Log: module1.lisp,v $
+;; Revision 2.3  2013/07/24 20:01:01  reids
+;; Updating lisp, java, python test programs to adhere to updated API
+;;
 ;; Revision 2.2  2009/01/12 15:54:58  reids
 ;; Added BSD Open Source license info
 ;;
@@ -55,11 +58,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;/
 
 ;;; Load the common file with all the type and name definitions
-(load (make-pathname :DIRECTORY (pathname-directory *LOAD-TRUENAME*)
-		     :NAME "module.lisp"))
+(eval-when (load eval)
+  (load (make-pathname :directory (pathname-directory *load-truename*)
+		       :name "module.lisp")))
 
-(IPC:IPC_defun_handler msg2Handler (msgRef lispData clientData)
-  (format T "msg2Handler: Receiving ~s (~s) [~s]~%" 
+(defun msg2Handler (msgRef lispData clientData)
+  (format t "msg2Handler: Receiving ~s (~s) [~s]~%" 
 	  (IPC:IPC_msgInstanceName msgRef) lispData clientData))
 
 (defun stdinHnd (fd clientData)
@@ -71,7 +75,7 @@
        #+ALLEGRO (top-level:do-command "reset") #+LISPWORKS (abort)
        )
       ((#\m #\M) 
-       (format T "~%  (IPC_publishData ~s ~d)~%" MSG1 42)
+       (format t "~%  (IPC_publishData ~s ~d)~%" MSG1 42)
        (IPC:IPC_publishData MSG1 42))
       ((#\r #\R) 
        (let ((t1 (make-T1 :i1 666
@@ -83,50 +87,50 @@
 					      :initial-contents
 					      '((0.0d0 1.0d0 2.0d0)
 						(1.0d0 2.0d0 3.0d0)))
-			  :d1 pi))
-	     r1)
-	 (format T "~%  (IPC_queryResponseData ~s ~a r1 IPC_WAIT_FOREVER)~%" 
+			  :d1 pi)))
+	 (format t "~%  (IPC_queryResponseData ~s ~a r1 IPC_WAIT_FOREVER)~%" 
 		 QUERY1 t1)
-	 (IPC:IPC_queryResponseData QUERY1 t1 r1 IPC:IPC_WAIT_FOREVER) 
-	 (format T "~%  Received response ~a~%" r1)
-	 ;; (IPC:IPC_printData (IPC:IPC_msgFormatter RESPONSE1) T r1Ptr)
-	 ))
-      (T (format T "stdinHnd [~s]: Received ~s" clientData inputLine)))))
+	 (let ((r1 (IPC:IPC_queryResponseData QUERY1 t1 IPC:IPC_WAIT_FOREVER)))
+	   (format t "~%  Received response ~a~%" r1)
+	   ;; (IPC:IPC_printData (IPC:IPC_msgFormatter RESPONSE1) t r1Ptr)
+	   )))
+      (T (format t "stdinHnd [~s]: Received ~s" clientData inputLine)))))
 
 (defun module1 ()
 
   ;; Connect to the central server
-  (format T "~%(IPC_connect ~s)~%" MODULE1_NAME)
+  (format t "~%(IPC_connect ~s)~%" MODULE1_NAME)
   (IPC:IPC_connect MODULE1_NAME)
 
   ;; Define the named formats that the modules need
-  (format T "~%(IPC_defineFormat ~s ~s)~%" T1_NAME T1_FORMAT)
+  (format t "~%(IPC_defineFormat ~s ~s)~%" T1_NAME T1_FORMAT)
   (IPC:IPC_defineFormat T1_NAME T1_FORMAT)
-  (format T "~%(IPC_defineFormat ~s ~s)~%" T2_NAME T2_FORMAT)
+  (format t "~%(IPC_defineFormat ~s ~s)~%" T2_NAME T2_FORMAT)
   (IPC:IPC_defineFormat T2_NAME T2_FORMAT)
   
   ;; Define the messages that this module publishes
-  (format T "~%(IPC_defineMsg ~s IPC_VARIABLE_LENGTH ~s)~%" MSG1 MSG1_FORMAT)
+  (format t "~%(IPC_defineMsg ~s IPC_VARIABLE_LENGTH ~s)~%" MSG1 MSG1_FORMAT)
   (IPC:IPC_defineMsg MSG1 IPC:IPC_VARIABLE_LENGTH MSG1_FORMAT)
 
-  (format T "~%(IPC_defineMsg ~s IPC_VARIABLE_LENGTH ~s)~%"
+  (format t "~%(IPC_defineMsg ~s IPC_VARIABLE_LENGTH ~s)~%"
 	  QUERY1 QUERY1_FORMAT)
   (IPC:IPC_defineMsg QUERY1 IPC:IPC_VARIABLE_LENGTH QUERY1_FORMAT)
 
   ;; Subscribe to the messages that this module listens to.
   ;;  NOTE: No need to subscribe to the RESPONSE1 message since it is a
   ;;        response to a query not a regular subscription!
-  (format T "~%(IPC_subscribe ~s 'msg2Handler ~s)~%" MSG2 MODULE1_NAME)
+  (format t "~%(IPC_subscribe ~s 'msg2Handler ~s)~%" MSG2 MODULE1_NAME)
   (IPC:IPC_subscribe MSG2 'msg2Handler MODULE1_NAME)
+  (IPC:IPC_msgClass RESPONSE1 'T2)
 
   ;; Subscribe a handler for tty input.
   ;;   Typing "q" will quit the program; Typing "m" will send MSG1;
   ;;   Typing "r" will send QUERY1 ("r" for response)
   ;; NOTE: 0 is the file descriptor number of stdin (the terminal)
-  (format T "~%(IPC_subscribeFD ~d 'stdinHnd ~s)~%" 0 MODULE1_NAME)
+  (format t "~%(IPC_subscribeFD ~d 'stdinHnd ~s)~%" 0 MODULE1_NAME)
   (IPC:IPC_subscribeFD 0 'stdinHnd MODULE1_NAME)
 
-  (format T "~%Type 'm' to send ~s; Type 'r' to send ~s; Type 'q' to quit~%"
+  (format t "~%Type 'm' to send ~s; Type 'r' to send ~s; Type 'q' to quit~%"
 	  MSG1 QUERY1)
 
   (IPC:IPC_dispatch)

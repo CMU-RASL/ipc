@@ -20,14 +20,20 @@
  * REVISION HISTORY
  *
  * $Log: ipcFFI.c,v $
+ * Revision 2.4  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
+ * Revision 2.3  2012/02/27 16:55:46  reids
+ * Fixed some problems with python and significantly improved transfer of arrays to/from python
+ *
  * Revision 2.2  2011/08/17 01:11:38  reids
  * Took out unused and LISP-specific functions
  *
  * Revision 2.1  2011/08/16 16:01:53  reids
  * Adding Python interface to IPC, plus some minor bug fixes
  *
- * $Revision: 2.2 $
- * $Date: 2011/08/17 01:11:38 $
+ * $Revision: 2.4 $
+ * $Date: 2013/07/23 21:13:39 $
  * $Author: reids $
  *****************************************************************************/
 
@@ -187,6 +193,29 @@ int32 formatGetInt(BUFFER_PTR buffer)
 					   0, buffer->buffer, buffer->bstart,
 					   byteOrder, alignment);
   return i;
+}
+
+void formatPutLong(BUFFER_PTR buffer, long l)
+{
+  buffer->bstart += x_ipc_LONG_Trans_Encode((GENERIC_DATA_PTR)&l,
+					    0, buffer->buffer, buffer->bstart);
+}
+
+long formatGetLong(BUFFER_PTR buffer)
+{
+  long l;
+  int byteOrder;
+  ALIGNMENT_TYPE alignment;
+
+  LOCK_M_MUTEX;
+  byteOrder = GET_M_GLOBAL(byteOrder);
+  alignment = GET_M_GLOBAL(alignment);
+  UNLOCK_M_MUTEX;
+  
+  buffer->bstart += x_ipc_LONG_Trans_Decode((GENERIC_DATA_PTR)&l, 
+					    0, buffer->buffer, buffer->bstart,
+					    byteOrder, alignment);
+  return l;
 }
 
 double formatGetFloat(BUFFER_PTR buffer)
@@ -385,6 +414,59 @@ void formatPutString (BUFFER_PTR buffer, const char * theString)
 BOOLEAN validFormatter (FORMAT_PTR format)
 {
   return format != NULL;
+}
+
+
+int msgByteOrder (void)
+{
+  int result;
+
+  LOCK_M_MUTEX;
+  result = GET_M_GLOBAL(byteOrder);
+  UNLOCK_M_MUTEX;
+
+  return result;
+}
+
+int hostByteOrder (void)
+{
+  return BYTE_ORDER;
+}
+
+void blockCopyToArray(BUFFER_PTR buffer, void *array, int32 amount)
+{
+  BCOPY(buffer->buffer+buffer->bstart, (char *)array, amount);
+  buffer->bstart += amount;
+}
+
+void blockCopyFromArray(BUFFER_PTR buffer, void *array, int32 amount)
+{
+  BCOPY((char *)array, buffer->buffer+buffer->bstart, amount);
+  buffer->bstart += amount;
+}
+
+/* Find, and return, the index of the string within the enum's names.
+   Return -1 if not found.  
+*/
+int32 enumStringIndex (CONST_FORMAT_PTR format, char *enumString)
+{
+  int i;
+  for (i=2; i<format->formatter.a[0].i; i++) {
+    if (STREQ(format->formatter.a[i].f->formatter.name, enumString)) {
+      return (i-2);
+    }
+  }
+  return -1;
+}
+
+char *enumValString (CONST_FORMAT_PTR format, int32 enumVal)
+{
+  if (format->formatter.a[0].i > 2 &&
+      0 <= enumVal && enumVal <= ENUM_MAX_VAL(format)) {
+    return (format->formatter.a[enumVal+2].f->formatter.name);
+  } else {
+    return "";
+  }
 }
 
 #ifdef NEED_DEBUGGING

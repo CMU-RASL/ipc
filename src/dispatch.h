@@ -18,6 +18,20 @@
  * REVISION HISTORY
  *
  * $Log: dispatch.h,v $
+ * Revision 2.5  2013/11/22 16:57:29  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
+ * Revision 2.4  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.3  2009/01/12 15:54:56  reids
  * Added BSD Open Source license info
  *
@@ -207,8 +221,8 @@
  * 20-Mar-89 Christopher Fedor, School of Computer Science, CMU
  * created.
  *
- * $Revision: 2.3 $
- * $Date: 2009/01/12 15:54:56 $
+ * $Revision: 2.5 $
+ * $Date: 2013/11/22 16:57:29 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -231,7 +245,7 @@
 #define DISPATCH_SET_STATUS(newStatus, dispatch) (dispatch->status = newStatus)
 
 #define DISPATCH_FROM_ID(id) \
-(DISPATCH_PTR)idTableItem(id, GET_S_GLOBAL(dispatchTable))
+  ((DISPATCH_PTR)idTableItem(id, GET_S_GLOBAL(dispatchTable)))
 
 typedef enum {
   UnallocatedDispatch=0, AllocatedDispatch=1, InactiveDispatch=2, 
@@ -261,9 +275,9 @@ typedef struct _DISPATCH_HND {
   HND_DATA_PTR hndData;
   struct _LIST *msgList;
   struct _RESOURCE *resource;
-  HND_LANGUAGE_ENUM hndLanguage;
 #ifdef NMP_IPC
   void *clientData;
+  BOOLEAN autoUnmarshall;
 #endif
 } DISPATCH_HND_TYPE, *DISPATCH_HND_PTR;
 
@@ -310,11 +324,15 @@ void dispatchUpdateAndDisplay(DISPATCH_STATUS_TYPE newStatus,
 void deliverDispatch(DISPATCH_PTR dispatch);
 void deliverResponse(DISPATCH_PTR dispatch);
 X_IPC_RETURN_VALUE_TYPE centralReply(DISPATCH_PTR dispatch, const void *data);
+X_IPC_RETURN_VALUE_TYPE centralReplyRaw(DISPATCH_PTR dispatch,
+					const void *data, int32 len);
 X_IPC_RETURN_VALUE_TYPE centralNullReply(DISPATCH_PTR dispatch);
 void centralSuccess(DISPATCH_PTR dispatch);
 void centralFailure(DISPATCH_PTR dispatch);
 X_IPC_RETURN_VALUE_TYPE centralInform(const char *name, const void *data);
 X_IPC_RETURN_VALUE_TYPE centralBroadcast(const char *name, const void *data);
+X_IPC_RETURN_VALUE_TYPE centralBroadcastRaw(const char *name,
+					    const void *data, int32 len);
 void *dispatchDecodeResponse(DISPATCH_PTR dispatch);
 void reserveDispatch(DISPATCH_PTR dispatch);
 void releaseDispatch(DISPATCH_PTR dispatch);

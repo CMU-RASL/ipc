@@ -1,7 +1,7 @@
 #############################################################################
-#       $Id: GNUmakefile,v 2.7 2011/08/17 01:15:23 reids Exp $
-# $Revision: 2.7 $
-#     $Date: 2011/08/17 01:15:23 $
+#       $Id: GNUmakefile,v 2.9 2013/07/24 01:50:54 reids Exp $
+# $Revision: 2.9 $
+#     $Date: 2013/07/24 01:50:54 $
 #   $Author: reids $
 #    $State: Exp $
 #   $Locker:  $
@@ -28,6 +28,12 @@
 # HISTORY:
 #
 # $Log: GNUmakefile,v $
+# Revision 2.9  2013/07/24 01:50:54  reids
+# Needed to remove README.MAC to get 'make ftp' to work
+#
+# Revision 2.8  2013/07/23 21:10:49  reids
+# No longer make xdrgen by default
+#
 # Revision 2.7  2011/08/17 01:15:23  reids
 # Added the python directory to the makefile
 #
@@ -58,7 +64,7 @@ endif
 MODULE_DIR	= 
 PROJECT		= ipc
 MODULE		= 
-SUBDIRS		= etc src lisp java python test doc xdrgen
+SUBDIRS		= etc src lisp java python test doc # xdrgen
 
 #############################################################################
 # Where are the standard files?
@@ -123,7 +129,7 @@ SRCS	=
 
 PRIVATE_INCS	= 
 
-MISC		=  GNUmakefile README.md README.MAC LICENSE.TXT
+MISC		=  GNUmakefile README LICENSE.TXT
 
 ##########
 # Default Target

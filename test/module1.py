@@ -13,8 +13,8 @@
 #                     Quits the program when a 'q' is typed.
 #                     Should be run in conjunction with module2.
 #
-# $Revision: 2.2 $
-# $Date: 2011/08/16 21:33:44 $
+# $Revision: 2.3 $
+# $Date: 2013/07/24 20:01:01 $
 # $Author: reids $
 #
 # Copyright (c) 2008, Carnegie Mellon University
@@ -24,6 +24,9 @@
 # REVISION HISTORY
 #
 # $Log: module1.py,v $
+# Revision 2.3  2013/07/24 20:01:01  reids
+# Updating lisp, java, python test programs to adhere to updated API
+#
 # Revision 2.2  2011/08/16 21:33:44  reids
 # Took out extraneous semi-colons
 #
@@ -33,6 +36,7 @@
 ###########################################################################
 
 import sys
+from primFmttrs import *
 import IPC
 from module import *
 
@@ -61,7 +65,7 @@ def stdinHnd (fd, clientData) :
     t1.d1 = 3.14159
     print "\n  IPC_queryResponseData(%s, %s, IPC_WAIT_FOREVER, %s)" % \
           (QUERY1, t1, T1.__name__)
-    (r1, ret) = IPC.IPC_queryResponseData(QUERY1, t1, IPC.IPC_WAIT_FOREVER, T1)
+    (r1, ret) = IPC.IPC_queryResponseData(QUERY1, t1, IPC.IPC_WAIT_FOREVER)
     print "\n  Received response"
     IPC.IPC_printData(IPC.IPC_msgFormatter(RESPONSE1), sys.stdout, r1)
   else :
@@ -123,6 +127,8 @@ def main () :
   print "\nIPC.IPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % \
         (QUERY1, QUERY1_FORMAT)
   IPC.IPC_defineMsg(QUERY1, IPC.IPC_VARIABLE_LENGTH, QUERY1_FORMAT)
+  IPC.IPC_msgClass(QUERY1, T1)
+  IPC.IPC_msgClass(RESPONSE1, T2)
   IPC.IPC_subscribeHandlerChange(QUERY1, handlerChangeHnd, None)
 
   # Subscribe to the messages that this module listens to.

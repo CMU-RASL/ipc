@@ -8,9 +8,9 @@
  * ABSTRACT: C-code for interfacing specifically with Python
  *           Used by SWIG (see ffi/IPC.i)
  *
- *       $Id: ipcPython.c,v 1.1 2011/08/16 16:00:36 reids Exp $
- * $Revision: 1.1 $
- *     $Date: 2011/08/16 16:00:36 $
+ *       $Id: ipcPython.c,v 1.3 2013/07/23 21:12:24 reids Exp $
+ * $Revision: 1.3 $
+ *     $Date: 2013/07/23 21:12:24 $
  *   $Author: reids $
  *    $State: Exp $
  *   $Locker:  $
@@ -21,6 +21,12 @@
  *
  * REVISION HISTORY
  * $Log: ipcPython.c,v $
+ * Revision 1.3  2013/07/23 21:12:24  reids
+ * Minor editing and bug fix
+ *
+ * Revision 1.2  2012/02/27 16:55:46  reids
+ * Fixed some problems with python and significantly improved transfer of arrays to/from python
+ *
  * Revision 1.1  2011/08/16 16:00:36  reids
  * Adding Python interface to IPC
  *
@@ -134,11 +140,18 @@ IPC_RETURN_TYPE unsubscribeHandlerChange (const char *msgName)
 
 IPC_RETURN_TYPE queryResponse (const char *msgName, unsigned int length,
  		               BYTE_ARRAY content, IPC_VARCONTENT_PTR vc,
-		               FORMATTER_CONTAINER_TYPE *replyFormat,
+		               FORMATTER_CONTAINER_TYPE *replyFormatContainer,
 			       unsigned int timeoutMsecs)
 {
-  return _IPC_queryResponse(msgName, length, content, &(vc->content),
-                            &replyFormat->formatter, timeoutMsecs);
+  FORMATTER_PTR replyFormat;
+  const char *replyMsgName = NULL;
+  int ret = _IPC_queryResponse(msgName, length, content, &(vc->content),
+			       &replyFormat, &replyMsgName, timeoutMsecs);
+  if (replyFormatContainer != NULL) {
+    replyFormatContainer->formatter = replyFormat;
+    replyFormatContainer->msgName = (char *)replyMsgName;
+  }
+  return ret;
 }
 
 IPC_RETURN_TYPE queryNotify (const char *msgName, unsigned int length,
@@ -195,3 +208,197 @@ void setExitProc (void)
   x_ipcRegisterExitProc(ipcErrorProc);
 }
 
+// *WAY* more efficient to encode/decode a whole array at once,
+// rather than element by element
+void encodeByteArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    formatPutByte(buffer, (int32)PyInt_AsLong(PySequence_GetItem(pyArray, i)));
+  }
+}
+
+void decodeByteArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i,
+		       PyInt_FromLong((long)formatGetByte(buffer)));
+  }
+}
+
+void encodeUByteArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    formatPutUByte(buffer,
+		   (int32)PyInt_AsLong(PySequence_GetItem(pyArray, i)));
+  }
+}
+
+void decodeUByteArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i
+		       , PyInt_FromLong((long)formatGetUByte(buffer)));
+  }
+}
+
+void encodeShortArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    formatPutShort(buffer, (int32)PyInt_AsLong(PySequence_GetItem(pyArray, i)));
+  }
+}
+
+void decodeShortArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i,
+		       PyInt_FromLong((long)formatGetShort(buffer)));
+  }
+}
+
+void encodeIntArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    formatPutInt(buffer, (int32)PyInt_AsLong(PySequence_GetItem(pyArray, i)));
+  }
+}
+
+void decodeIntArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i, PyInt_FromLong((long)formatGetInt(buffer)));
+  }
+}
+
+SWIGINTERN int SWIG_AsVal_char (PyObject * obj, char *val);
+SWIGINTERNINLINE PyObject *SWIG_From_char  (char c);
+
+void encodeCharArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  char c;
+  for (i=0; i<len; i++) {
+    SWIG_AsVal_char(PySequence_GetItem(pyArray, i), &c);
+    formatPutChar(buffer, c);
+  }
+}
+
+void decodeCharArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i, SWIG_From_char(formatGetChar(buffer)));
+  }
+}
+
+void encodeFloatArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    formatPutFloat(buffer,
+		   (float)PyFloat_AsDouble(PySequence_GetItem(pyArray, i)));
+  }
+}
+
+void decodeFloatArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i,
+		       PyFloat_FromDouble((double)formatGetFloat(buffer)));
+  }
+}
+
+void encodeDoubleArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    formatPutDouble(buffer, PyFloat_AsDouble(PySequence_GetItem(pyArray, i)));
+  }
+}
+
+void decodeDoubleArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i,
+		       PyFloat_FromDouble(formatGetDouble(buffer)));
+  }
+}
+
+void encodeBooleanArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    formatPutInt(buffer, (int32)PyInt_AsLong(PySequence_GetItem(pyArray, i)));
+  }
+}
+
+void decodeBooleanArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  fprintf(stderr, "HERE\n");
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i,
+		       (formatGetInt(buffer) == 0 ? Py_False : Py_True));
+  }
+}
+
+void encodeUShortArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    formatPutUShort(buffer, (int32)PyInt_AsLong(PySequence_GetItem(pyArray, i)));
+  }
+}
+
+void decodeUShortArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i,
+		       PyInt_FromLong((long)formatGetUShort(buffer)));
+  }
+}
+
+void encodeUIntArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    formatPutUInt(buffer, (int32)PyInt_AsLong(PySequence_GetItem(pyArray, i)));
+  }
+}
+
+void decodeUIntArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i,
+		       PyInt_FromLong((long)formatGetUInt(buffer)));
+  }
+}
+
+void encodeLongArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    long l = (long)PyInt_AsLong(PySequence_GetItem(pyArray, i));
+    formatPutLong(buffer, l);
+  }
+}
+
+void decodeLongArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
+{
+  int i;
+  for (i=0; i<len; i++) {
+    PySequence_SetItem(pyArray, i, PyInt_FromLong(formatGetLong(buffer)));
+  }
+}

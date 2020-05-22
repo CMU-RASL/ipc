@@ -12,8 +12,8 @@
  *                       Exits when 'q' is typed at terminal
  *                       Should be run in conjunction with module1 and module2
  *
- * $Revision: 2.3 $
- * $Date: 2009/09/04 19:09:27 $
+ * $Revision: 2.4 $
+ * $Date: 2013/07/24 20:01:01 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -23,6 +23,9 @@
  * REVISION HISTORY
  *
  * $Log: module3.java,v $
+ * Revision 2.4  2013/07/24 20:01:01  reids
+ * Updating lisp, java, python test programs to adhere to updated API
+ *
  * Revision 2.3  2009/09/04 19:09:27  reids
  * IPC Java is now in its own package
  *
@@ -39,33 +42,30 @@ import ipc.java.*;
 
 public class module3 extends module {
   private static class msg1Handler implements IPC.HANDLER_TYPE {
-    msg1Handler(String theClientData) { clientData = theClientData; }
-    public void handle (IPC.MSG_INSTANCE msgRef, Object callData) {
+    public void handle (MSG_INSTANCE msgRef, Object callData, 
+			Object clientData) {
       System.out.println("msg1Handler: Receiving "+
-			 IPC.msgInstanceName(msgRef) +" ("+ callData
+			 IPC.IPC_msgInstanceName(msgRef) +" ("+ callData
 			 +") ["+ clientData +"]");
     }
-    String clientData;
   }
 
   private static class msg2Handler implements IPC.HANDLER_TYPE {
-    msg2Handler(String theClientData) { clientData = theClientData; }
-    public void handle (IPC.MSG_INSTANCE msgRef, Object callData) {
+    public void handle (MSG_INSTANCE msgRef, Object callData, 
+			Object clientData) {
       System.out.println("msg2Handler: Receiving "+
-			 IPC.msgInstanceName(msgRef) +" (\""+ callData
+			 IPC.IPC_msgInstanceName(msgRef) +" (\""+ callData
 			 +"\") ["+ clientData +"]");
     }
-    String clientData;
   }
 
   private static class stdinHnd implements IPC.FD_HANDLER_TYPE {
-    stdinHnd(String theClientData) { clientData = theClientData; }
-    public void handle (int fd) {
+    public void handle (int fd, Object clientData) {
       try {
 	  int in = System.in.read();
 
 	  if (in == 'q' || in == 'Q') {
-	    IPC.disconnect();
+	    IPC.IPC_disconnect();
 	    System.exit(-1);
 	  } else {
 	    System.out.println("stdinHnd ["+ clientData +"]: Received "+ 
@@ -75,32 +75,33 @@ public class module3 extends module {
 	while (System.in.available() > 0) System.in.read();
       } catch (Exception e) { e.printStackTrace(); }
     }
-    String clientData;
   }
 
   public static void main (String args[]) throws Exception {
     /* Connect to the central server */
-    System.out.println("\nIPC.connect(\""+ MODULE3_NAME +"\")");
-    IPC.connect(MODULE3_NAME);
+    System.out.println("\nIPC.IPC_connect(\""+ MODULE3_NAME +"\")");
+    IPC.IPC_connect(MODULE3_NAME);
 
     /* Subscribe to the messages that this module listens to. */
-    System.out.println("\nIPC.subscribeData(\""+ MSG1 +"\", new msg1Handler(\""+
+    System.out.println("\nIPC.IPC_subscribeData(\""+ MSG1 +"\", new msg1Handler(\""+
 		       MODULE3_NAME +"\"), int.class)");
-    IPC.subscribeData(MSG1, new msg1Handler(MODULE3_NAME), int.class);
+    IPC.IPC_msgClass(MSG1, int.class);
+    IPC.IPC_subscribeData(MSG1, new msg1Handler(), MODULE3_NAME);
 
-    System.out.println("\nIPC.subscribeData(\""+ MSG2 +"\", new msg2Handler(\""+
+    System.out.println("\nIPC.IPC_subscribeData(\""+ MSG2 +"\", new msg2Handler(\""+
 		       MODULE3_NAME +"\"), String.class)");
-    IPC.subscribeData(MSG2, new msg2Handler(MODULE3_NAME), String.class);
+    IPC.IPC_msgClass(MSG2, String.class);
+    IPC.IPC_subscribeData(MSG2, new msg2Handler(), MODULE3_NAME);
 
     /* Subscribe a handler for tty input. Typing "q" will quit the program. */
     System.out.println("\nIPC_subscribeFD(0, new stdinHnd(\""+ 
 		       MODULE3_NAME +"\"))");
-    IPC.subscribeFD(0, new stdinHnd(MODULE3_NAME));
+    IPC.IPC_subscribeFD(0, new stdinHnd(), MODULE3_NAME);
 
     System.out.println("\nType 'q' to quit");
-    IPC.dispatch();
+    IPC.IPC_dispatch();
 
-    IPC.disconnect();
+    IPC.IPC_disconnect();
   }
 }
 

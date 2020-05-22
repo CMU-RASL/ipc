@@ -1,7 +1,7 @@
 #############################################################################
-#       $Id: GNUmakefile,v 2.15 2011/08/17 15:58:06 reids Exp $
-# $Revision: 2.15 $
-#     $Date: 2011/08/17 15:58:06 $
+#       $Id: GNUmakefile,v 2.18 2013/08/09 14:01:25 reids Exp $
+# $Revision: 2.18 $
+#     $Date: 2013/08/09 14:01:25 $
 #   $Author: reids $
 #    $State: Exp $
 #   $Locker:  $
@@ -26,6 +26,15 @@
 # HISTORY:
 #
 # $Log: GNUmakefile,v $
+# Revision 2.18  2013/08/09 14:01:25  reids
+# Updates for running Lisp version under Darwin
+#
+# Revision 2.17  2013/07/24 01:43:09  reids
+# A few bugs fixed for the 3.10.0 version
+#
+# Revision 2.16  2013/07/23 21:13:39  reids
+# Updated for using SWIG (removing internal Lisp functionality)
+#
 # Revision 2.15  2011/08/17 15:58:06  reids
 # Updated makefiles to include new Python stuff for tar'ing up
 #
@@ -118,11 +127,6 @@ DEPEND_PREFIX	= $(ODIR)/ $(SODIR)/
 VERSION_FILE	= ipcPriv.h
 VERSION_PREFIX	= IPC
 
-# Uncomment the following line to make the libraries useable by Allegro Common Lisp
-#USE_LISP	= 1
-# Uncomment the following line to make the libraries useable by Java for 64 bit machines
-#USE_JAVA	= 1
-
 #############################################################################
 # Standard Makefile Includes
 #############################################################################
@@ -150,11 +154,6 @@ include $(DEFS_FILE)
 PUBLIC_BINS_SunOS	= 
 ifneq ($(THIS_OS),vxworks)
 PUBLIC_BINS		= central  $(PUBLIC_BINS_$(THIS_OS))
-endif
-
-ifdef USE_LISP
-PUBLIC_LIBS_Solaris	= libipc_lisp.so libipc_lisp.sa
-PUBLIC_LIBS_Linux	= libipc_lisp.so libipc_lisp.sa
 endif
 
 PUBLIC_LIBS_RISC	= 
@@ -194,9 +193,6 @@ LIBOBJS = ipc.o queryResponse.o marshall.o timer.o \
 	  comModule.o com.o globalM.o globalMUtil.o strList.o \
 	  modLogging.o modVar.o resMod.o \
 	  parseFmttrs.o lex.o printData.o 
-ifdef USE_LISP
-LIBOBJS += ipcLisp.o
-endif
 
 VXLIBOBJS = $(patsubst %,$(VODIR)/%,$(LIBOBJS))
 
@@ -235,7 +231,7 @@ TCA_SRCS        = list.c behaviors.c tcModError.c \
 		  primFmttrs.c reg.c sendMsg.c tcaMem.c tcaRef.c \
 		  comModule.c com.c globalM.c globalMUtil.c strList.c \
 		  modLogging.c modVar.c resMod.c \
-		  parseFmttrs.c lex.c printData.c ipcLisp.c ipcFFI.c
+		  parseFmttrs.c lex.c printData.c ipcFFI.c
 ifeq ($(shell uname),CYGWIN32_NT)
 TCA_SRCS	+= wsocksrt.c
 LIBOBJS		+= wsocksrt.o
@@ -338,7 +334,7 @@ $(PUBLIC_LIB_DIR)/libipc.a: $(MODULEOBJS)
 
 $(LDIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR): $(SHAREDOBJS)
 	$(LD_SHARED) -o \
-	$(LDIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR) \
+	$(PWD)/$(LDIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR) \
 		$(SHAREDOBJS) $(LIB_PATH)
 
 $(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR): $(SHAREDOBJS)
@@ -354,18 +350,6 @@ ifeq ($(THIS_MACHINE),sun4u)
 LIBACL	= /usr/local/lib/acl60/libacl601.so
 endif
 
-$(LDIR)/libipc_lisp.so: $(SHAREDOBJS)
-	$(LD_SHARED) -o $@ $(SHAREDOBJS) $(LIB_PATH) $(LIBACL)
-
-$(PUBLIC_LIB_DIR)/libipc_lisp.so : $(SHAREDOBJS)
-
-$(LDIR)/libipc_lisp.sa: $(MODULEDATA)
-	$(RM) $@
-	$(AR) $(ARFLAGS) $@ $(MODULEDATA)
-	$(RANLIB) $@
-
-$(PUBLIC_LIB_DIR)/libipc_lisp.sa: $(MODULEDATA)
-
 # this dependency is used to update the version information.
 # $(ODIR)/ipc.o: $(SRCS_ALL)
 
@@ -380,30 +364,9 @@ CFLAGS += -fPIC
 endif
 
 ifdef USE_LISP
-DEFINES		+= -DLISP -DALLEGRO
-ifeq ($(THIS_OS),SunOS)
-LISP_INC_DIR	= /usr/misc/.allegro/lib/misc
-else
-ifeq ($(THIS_OS),Solaris)
-LISP_INC_DIR	= /afs/cs/local/allegro/sun4_41/beta/lib/misc
-else
-LISP_INC_DIR	= .
-endif
-endif
-FOUND_LISP := $(shell ls $(LISP_INC_DIR)/lisp.h 2>/dev/null | grep -v "not found" | head -1)
-INC_PATH += -I$(LISP_INC_DIR)
-
-ifeq ($(FOUND_LISP),)
-$(ODIR)/ipcLisp.o::
-	echo "error: CANNOT FIND lisp.h IN $(LISP_INC_DIR)"
-	echo "  Need to change LISP_INC_DIR in GNUmakefile"
-	foo # Use this to cause gmake to exit
-endif
-
-ifeq ($(THIS_OS),wnt)
-DEFINES += -DPC_ALLEGRO
-endif
-
+# Uncomment next two lines if using a 32 bit Lisp
+#CFLAGS		+= -m32 -DAcl32Bit
+#LD_SHARED	+= -melf_i386
 endif
 
 ifdef ACCESS_CONTROL

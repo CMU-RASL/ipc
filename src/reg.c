@@ -14,8 +14,8 @@
  * Register messages and handlers
  *
  * $Source: /afs/cs.cmu.edu/project/TCA/Master/ipc/src/reg.c,v $ 
- * $Revision: 2.7 $
- * $Date: 2009/05/04 19:03:41 $
+ * $Revision: 2.9 $
+ * $Date: 2013/11/22 16:57:30 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -25,6 +25,20 @@
  * REVISION HISTORY:
  *
  * $Log: reg.c,v $
+ * Revision 2.9  2013/11/22 16:57:30  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
+ * Revision 2.8  2013/07/23 21:13:39  reids
+ * Updated for using SWIG (removing internal Lisp functionality)
+ *
  * Revision 2.7  2009/05/04 19:03:41  reids
  * Changed to using snprintf to avoid corrupting the stack on overflow
  *
@@ -329,19 +343,8 @@
  * Forward Declarations
  *****************************************************************************/
 
-#undef x_ipcRegisterHandler
-void _x_ipcRegisterHandler(const char *msgName, const char *hndName, 
-			 X_IPC_HND_FN hndProc);
-
-#if !(defined(LISP) && defined(CLISP))
 void x_ipcRegisterHandler(const char *msgName, const char *hndName,
-			X_IPC_HND_FN hndProc);
-#else /* LISP && CLISP */
-extern lispdispatch(char *hndName, X_IPC_REF_PTR ref, char *data);
-
-void x_ipcRegisterHandler(const char *msgName, const char *hndName);
-#endif /* LISP && CLISP */
-
+			  X_IPC_HND_FN hndProc);
 
 /******************************************************************************
  *
@@ -544,9 +547,9 @@ HND_PTR x_ipc_selfRegisterHnd(int sd, MODULE_PTR hndOrg,
     hnd->hndData = hndData;
     hnd->msgList = x_ipc_listCreate();
     hnd->resource = NULL;
-    hnd->hndLanguage = C_LANGUAGE; /* The default */
 #ifdef NMP_IPC
     hnd->clientData = NO_CLIENT_DATA;
+    hnd->autoUnmarshall = FALSE;
     hnd->isRegistered = TRUE;
 #endif
     
@@ -562,10 +565,7 @@ HND_PTR x_ipc_selfRegisterHnd(int sd, MODULE_PTR hndOrg,
       hnd->hndData->refId = localId;
   } else {
     LOCK_M_MUTEX;
-    if (!IS_LISP_MODULE() && hndProc != hnd->hndProc) {
-      /* 24-Jun-91: fedor: the warning is not meaningful for lisp because each
-	 re-register will cause a pointer change - lisp functions are not at
-	 static locations like c */
+    if (hndProc != hnd->hndProc) {
       X_IPC_MOD_WARNING1("\nWARNING: Procedure change ignored for existing handler %s.\n",
 			 hnd->hndData->hndName);
     }
@@ -626,10 +626,6 @@ void x_ipc_hndDelete(HND_PTR hnd)
   MSG_PTR msg;
   
   if (hnd) {
-    if (hnd->hndLanguage == UNKNOWN_LANGUAGE) return;
-    
-    hnd->hndLanguage = UNKNOWN_LANGUAGE;
-    
     hnd->msg = NULL;
     msgList = hnd->msgList;
     hnd->msgList = NULL; /* to revent recursion of free's */
@@ -730,8 +726,8 @@ void x_ipcRegisterMessage(const char *name, X_IPC_MSG_CLASS_TYPE msg_class,
 
 /*************************************************************************/
 
-void _x_ipcRegisterHandlerL(const char *msgName, const char *hndName, 
-			  X_IPC_HND_FN hndProc, HND_LANGUAGE_ENUM hndLanguage)
+void x_ipcRegisterHandler(const char *msgName, const char *hndName, 
+			  X_IPC_HND_FN hndProc)
 {
   HND_DATA_PTR hndData;
   HND_PTR hnd;
@@ -750,7 +746,6 @@ void _x_ipcRegisterHandlerL(const char *msgName, const char *hndName,
   hndData->hndName = strdup(hndName);
   
   hnd = x_ipc_selfRegisterHnd(0, (MODULE_PTR)NULL, hndData, hndProc);
-  hnd->hndLanguage = hndLanguage;
   
   if (x_ipcInform(X_IPC_REGISTER_HND_INFORM, (void *)hndData) == Success) {
     if (hnd->hndData != hndData) {
@@ -760,44 +755,6 @@ void _x_ipcRegisterHandlerL(const char *msgName, const char *hndName,
     }
   }
 }
-
-/* Also maintain the original function without the language parameter 
- * for compatibility. 
- */
-
-#if !(defined(LISP) && defined(CLISP))
-void _x_ipcRegisterHandler(const char *msgName, const char *hndName, 
-			 X_IPC_HND_FN hndProc)
-{
-  x_ipcRegisterHandler(msgName, hndName, hndProc);
-}
-
-/* put in a function with the original name so that old code will still 
- * link with the new library.
- * This should be removed in the next release. RTG.
- */
-#undef x_ipcRegisterHandler
-void x_ipcRegisterHandler(const char *msgName, const char *hndName,
-			X_IPC_HND_FN hndProc)
-{
-  _x_ipcRegisterHandler(msgName, hndName, hndProc);
-}
-
-#else /* LISP && CLISP */
-
-/* Clisp needs to have the handler dispatched in the lisp code since it can
- * not register lisp function to call from c at run time.
- */
-static void clispDispatch(X_IPC_REF_PTR ref, char *data)
-{
-  lispdispatch((char *)ref->msg->msgData->name, ref, data);
-}
-
-void x_ipcRegisterHandler(const char *msgName, const char *hndName)
-{
-  _x_ipcRegisterHandlerL(msgName, hndName, clispDispatch,LISP_LANGUAGE);
-}
-#endif /* LISP && CLISP */
 
 /******************************************************************************
  *
@@ -893,7 +850,7 @@ void x_ipcRegisterLengthFormatter(const char *formatter, int32 length)
 
 int x_ipcMessageRegistered(const char *msgName)
 {
-  return (x_ipc_msgFind2(msgName, (const char *)NULL) != NULL);
+  return (x_ipc_msgFind3(msgName) != NULL);
 }
 
 /*****************************************************************************

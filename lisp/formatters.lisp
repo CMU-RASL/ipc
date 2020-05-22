@@ -8,8 +8,8 @@
 ;;; ABSTRACT: Data Format Routines
 ;;;           Same as the TCA formatters.lisp file, except in the IPC package.
 ;;;
-;;; $Revision: 2.3 $
-;;; $Date: 2009/01/12 15:54:55 $
+;;; $Revision: 2.5 $
+;;; $Date: 2013/09/22 21:19:43 $
 ;;; $Author: reids $
 ;;;
 ;;; Copyright (c) 2008, Carnegie Mellon University
@@ -19,6 +19,12 @@
 ;;; REVISION HISTORY
 ;;;
 ;;;  $Log: formatters.lisp,v $
+;;;  Revision 2.5  2013/09/22 21:19:43  reids
+;;;  Updated how named structs are allocated in unmarshalling
+;;;
+;;;  Revision 2.4  2013/07/23 21:11:49  reids
+;;;  Updated for using SWIG
+;;;
 ;;;  Revision 2.3  2009/01/12 15:54:55  reids
 ;;;  Added BSD Open Source license info
 ;;;
@@ -82,32 +88,22 @@
 (defconstant ARRAY_ELEM_SIZE	1)
 (defconstant LISP_STRUCT_START	1)
 (defconstant LISP_ARRAY_START	0)
-#+:FRANZ-INC (defvar *LISP-C-GLOBAL-STRING-BUF*)
+#+:franz-inc (defvar *LISP-C-GLOBAL-STRING-BUF*)
 
 (defun findSimpleType (format)
-  #+MCL (declare (ignore format)) #+MCL NIL
+  #+MCL (declare (ignore format)) #+MCL nil
   #-MCL
   (when (eql (formatType format) PrimitiveFMT)
      (funcall (aref TransTable (formatPrimitiveProc format))
-	      SimpleType NIL 0 NIL)))
+	      SimpleType nil 0 nil)))
 
 (defun findSimpleTypeSize (format)
   (when (eql (formatType format) PrimitiveFMT)
      (funcall (aref TransTable (formatPrimitiveProc format))
-	      SimpleTypeSize NIL 0 NIL)))
+	      SimpleTypeSize nil 0 nil)))
 
 (defun Explicit-Format-Error ()
   (error "LISP Version of IPC can only use explicit formats"))
-
-(ff:defforeign 'findNamedFormat
-  :entry-point (ff::convert-to-lang "findNamedFormat")
-  :arguments   '(integer)
-  :return-type :integer)
-
-(ff:defforeign 'enumStringIndex
-  :entry-point (ff::convert-to-lang "enumStringIndex")
-  :arguments   '(integer #|format|# string)
-  :return-type :integer)
 
 ;;; Return the integer value associated with the enum symbol
 ;;; (NIL if not found)
@@ -118,44 +114,12 @@
 	  (setf (get enumSymbol :IPC_ENUM_INDEX) enumVal)
 	  enumVal))))
 
-#+(AND ALLEGRO (NOT ALLEGRO-V6.0))
-(ff:defforeign 'enumValNameLength
-  :entry-point (ff::convert-to-lang "enumValNameLength")
-  :arguments   '(integer #|format|# integer #|value|#)
-  :return-type :integer #|length|#) 
-
-#+(AND ALLEGRO (NOT ALLEGRO-V6.0))
-(ff:defforeign 'enumValNameString
-  :entry-point (ff::convert-to-lang "enumValNameString")
-  :arguments   '(integer #|format|# integer #|value|#)
-  :return-type :lisp #|string|#) 
-
 ;;; Get the symbol associated with the enum integer value
 ;;; (or NIL if outside range, or enum does not have values specified)
-;;; Change as of 1/23/97 forces all Lisp enums to uppercase
-#+(AND ALLEGRO (NOT ALLEGRO-V6.0))
-(defun getNthEnum (format enumVal)
-  (let ((length (enumValNameLength format enumVal)))
-    (cond ((zerop length) NIL)
-	  (T (setq *LISP-C-GLOBAL-STRING-BUF* (make-string length))
-	     (multiple-value-bind (index value)
-		 (ff:register-value '*LISP-C-GLOBAL-STRING-BUF* 0)
-	       (declare (ignore index) (ignore value))
-	       (intern (enumValNameString format enumVal) :KEYWORD))))))
-
-#+ (or LISPWORKS MCL ALLEGRO-V6.0)
-(ff:defforeign 'enumValString
-  :entry-point (ff::convert-to-lang "enumValString")
-  :arguments   '(integer #|format|# integer #|value|#)
-  :return-type :string #|name|#)
-
-;;; Get the symbol associated with the enum integer value
-;;;  (or NIL if outside range, or enum does not have values specified)
-#+ (or LISPWORKS MCL ALLEGRO-V6.0)
 (defun getNthEnum (format enumVal)
   (let ((name (enumValString format enumVal)))
-    (cond ((zerop (length name)) NIL)
-	  (T (intern name :KEYWORD)))))
+    (cond ((zerop (length name)) nil)
+	  (t (intern name :keyword)))))
 
 ;;;
 ;;; First element in a FormatArray is the size of the array.
@@ -165,7 +129,7 @@
 (defun fixedArrayDimensions (formatArray)
   (let (arrayDimensions)
     (doArrayFormat (i formatArray)
-       (setq arrayDimensions (cons (formatFormatArrayItem formatArray i) 
+       (setq arrayDimensions (cons (formatFormatArrayItemInt formatArray i) 
 				   arrayDimensions)))
     (nreverse arrayDimensions)))
 
@@ -173,30 +137,32 @@
   (let ((parentStructArray (formatFormatArray parentFormat))
         currentPlace arrayDimensions)
     (do ((place 1 (1+ place))
-         (foundPlace NIL (and (eql VarArrayFMT
+         (foundPlace nil (and (eql VarArrayFMT
 				   (formatType 
 				    (formatFormatArrayItem parentStructArray
 							   place)))
-                               (eql formatArray
-                                    (formatFormatArray
-				    (formatFormatArrayItem parentStructArray
-							   place))))))
+                               (eql (ff:foreign-pointer-address formatArray)
+				    (ff:foreign-pointer-address 
+				     (formatFormatArray
+				      (formatFormatArrayItem parentStructArray
+							     place)))))))
         (foundPlace (setq currentPlace (1- place))))
-  
+      
     (doArrayFormat (i formatArray)
-       (let ((sizePlace (formatFormatArrayItem formatArray i))
+       (let ((sizePlace (ff:foreign-pointer-address 
+			 (formatFormatArrayItem formatArray i)))
 	     (offset 0))
 	 (cond ((< currentPlace sizePlace)
 		(do ((j currentPlace (1+ j)))
 		    ((>= j sizePlace))
 		  (incf offset (DataStructureSize
 				(formatFormatArrayItem parentStructArray j)))))
-	       (T (do ((j sizePlace (1+ j)))
+	       (t (do ((j sizePlace (1+ j)))
 		      ((>= j currentPlace))
 		   (decf offset (DataStructureSize 
 			(formatFormatArrayItem parentStructArray j))))))
 	 (push (aref dataStruct (+ dStart offset)) arrayDimensions)))
-      (nreverse arrayDimensions)))
+    (nreverse arrayDimensions)))
 
 ;;; 
 ;;; TRANSFERRING DATA TO AND FROM ARRAYS TAKES ADVANTAGE OF THE FACT
@@ -206,8 +172,8 @@
 ;;;
 (defun displaced_vector (Array)
   (make-array (array-total-size Array)
-	      :DISPLACED-TO Array
-	      :ELEMENT-TYPE (array-element-type Array)))
+	      :displaced-to Array
+	      :element-type (array-element-type Array)))
 
 (defmacro check-dimensions (expected-dimensions Array)
   `(unless (and (<= (car ,expected-dimensions) (car (array-dimensions ,Array)))
@@ -231,16 +197,16 @@
                  (break "~% Data formatter not implemented for primitive ~A" 
 			(formatPrimitiveProc format)))
 	     (incf bufSize
-		   (funcall formatProc ELength dataStruct currentData NIL))
+		   (funcall formatProc ELength dataStruct currentData nil))
              (incf currentData
-		   (funcall formatProc ALength NIL 0 NIL))))
+		   (funcall formatProc ALength nil 0 nil))))
 
           ((eql type PointerFMT)
 	   (incf bufSize CHAR_SIZE)
 	   (when (aref dataStruct currentData)
 	     (incf bufSize 
 		   (BufferSize1 (formatChoosePtrFormat format parentFormat)
-				dataStruct currentData NIL)))
+				dataStruct currentData nil)))
 	   (incf currentData STRUCT_ELEM_SIZE))
 
           ((eql type StructFMT)
@@ -262,13 +228,13 @@
 		  (elementSize (findSimpleTypeSize nextFormat))
 		  (array (aref dataStruct currentData)))
 	     (cond (elementSize
-		    (incf bufSize (* (BufferSize1 nextFormat array 0 NIL)
+		    (incf bufSize (* (BufferSize1 nextFormat array 0 nil)
 				     (apply #'* arrayDimensions))))
-		   (T (let ((dispVector (displaced_vector array)))
+		   (t (let ((dispVector (displaced_vector array)))
 			(check-dimensions arrayDimensions array)
 			(dotimes (i (array-total-size dispVector))
 			  (incf bufSize 
-				(BufferSize1 nextFormat dispVector i NIL))))))
+				(BufferSize1 nextFormat dispVector i nil))))))
 	     (incf currentData STRUCT_ELEM_SIZE)))
 
           ((eql type VarArrayFMT)
@@ -284,14 +250,14 @@
 
 	     (cond ((zerop arraySize))
 		   (elementSize (incf bufSize (* (BufferSize1 nextFormat
-							      array 0 NIL)
+							      array 0 nil)
 						 arraySize)))
-		   (T (let* ((array (aref dataStruct currentData))
+		   (t (let* ((array (aref dataStruct currentData))
 			     (dispVector (displaced_vector array)))
 			(check-dimensions arrayDimensions array)
 			(dotimes (i arraySize)
 			  (incf bufSize (BufferSize1 nextFormat
-						     dispVector i NIL))))))
+						     dispVector i nil))))))
              (incf currentData STRUCT_ELEM_SIZE)))
 
 	  ((eql type NamedFMT)
@@ -313,20 +279,20 @@
           ((eql type PrimitiveFMT)
            (let ((formatProc (aref TransTable (formatPrimitiveProc format))))
 	     (funcall formatProc Encode dataStruct currentData buffer)
-	     (incf currentData (funcall formatProc ALength NIL
-					LISP_STRUCT_START NIL))))
+	     (incf currentData (funcall formatProc ALength nil
+					LISP_STRUCT_START nil))))
 
           ((eql type PointerFMT) 
 	   (let ((ptrVal (if (aref dataStruct currentData)
 			     ;; Z means data, 0 means NIL
-			     (character #\Z)
-			   (character 0))))
-	     (formatPutChar buffer ptrVal)
-	     (if (eql ptrVal (character #\Z))
+			     (char-int #\Z)
+			     0)))
+	     (formatPutByte buffer ptrVal)
+	     (if (eql ptrVal (char-int #\Z))
 		 (let ((nextFormat (formatChoosePtrFormat format
 							  parentFormat)))
 		   (TransferToBuffer nextFormat dataStruct
-				     currentData buffer NIL)))
+				     currentData buffer nil)))
 	     (incf currentData STRUCT_ELEM_SIZE)))
 
           ((eql type StructFMT)
@@ -349,15 +315,15 @@
 		  (dispVector (displaced_vector array)))
 	     (check-dimensions arrayDimensions array)
 	     (cond ((and elementSize
-			#+:ACLPC(not (eq (array-element-type dispVector)
+			#+:aclpc(not (eq (array-element-type dispVector)
 						'character))
 			(equal (array-element-type dispVector)
 			       (findSimpleType nextFormat)))
 		    (blockCopyFromArray buffer dispVector 
 					(* elementSize arraySize)))
-		   (T
+		   (t
 		    (dotimes (i arraySize)
-		      (TransferToBuffer nextFormat dispVector i buffer NIL))))
+		      (TransferToBuffer nextFormat dispVector i buffer nil))))
 	     (incf currentData STRUCT_ELEM_SIZE)))
 
           ((eql type VarArrayFMT)
@@ -370,7 +336,7 @@
 
 	     (formatPutInt buffer arraySize)
 	     (cond ((zerop arraySize))
-		   (T (let* ((dispVector (displaced_vector array))
+		   (t (let* ((dispVector (displaced_vector array))
 			     (elementSize (findSimpleTypeSize nextFormat)))
 			(check-dimensions arrayDimensions array)
 			(cond ((and elementSize 
@@ -378,14 +344,14 @@
 					   (findSimpleType nextFormat)))
 			       (blockCopyFromArray buffer dispVector 
 						   (* elementSize arraySize)))
-			      (T
+			      (t
 			       (dotimes (i arraySize)
 				 (TransferToBuffer nextFormat dispVector
-						   i buffer NIL)))))))
+						   i buffer nil)))))))
              (incf currentData STRUCT_ELEM_SIZE)))
 
 	  ((eql type NamedFMT)
-	   (transferToBuffer (findNamedFormat format) dataStruct
+	   (TransferToBuffer (findNamedFormat format) dataStruct
 			     dStart buffer parentFormat)
 	   (incf currentData STRUCT_ELEM_SIZE))
 
@@ -408,7 +374,7 @@
           
           ((eql type PrimitiveFMT)
            (incf size (funcall (aref TransTable (formatPrimitiveProc format))
-                               ALength NIL LISP_STRUCT_START NIL)))
+                               ALength nil LISP_STRUCT_START nil)))
           
           ((or (eql type PointerFMT) (eql type VarArrayFMT))
            (incf size STRUCT_ELEM_SIZE))
@@ -422,13 +388,13 @@
 		 ;; in a structure.
 		 (incf size (cond ((eql (formatType nextFormat) PrimitiveFMT)
 				   (DataStructureSize nextFormat))
-				  (T STRUCT_ELEM_SIZE)))))))
+				  (t STRUCT_ELEM_SIZE)))))))
 
           ((eql type FixedArrayFMT)
 	   (incf size STRUCT_ELEM_SIZE))
 
 	  ((eql type NamedFMT) 
-	   (incf size (dataStructureSize (findNamedFormat format))))
+	   (incf size (DataStructureSize (findNamedFormat format))))
 
 	  ((eql type EnumFMT)
 	   (incf size STRUCT_ELEM_SIZE)))
@@ -437,17 +403,32 @@
 
 ;;; *************************************************************
 
+(defun make-data-struct (classSymbol)
+  (let ((constructor (when (and classSymbol
+				(excl::structure-type-p classSymbol))
+		       (intern (format nil "make-~a" classSymbol)))))
+    (when (fboundp constructor) (funcall constructor))))
+
+(defun make-data-struct-from-parent (parent dStart)
+  (let ((struct-defn (get (aref parent 0) 'excl::%structure-definition)))
+    (when struct-defn
+      (let ((field (car (member dStart (excl::dd-slots struct-defn)
+				:key #'excl::dsd-index))))
+	(when field (make-data-struct (excl::dsd-type field)))))))
+
 (defun make-TC_Struct (size &optional (type :DATA))
   (let ((new_struct (make-array (1+ size))))
     (setf (aref new_struct 0) type)
     new_struct))
 
-(defun get-or-allocate-TC_Struct (size DataStruct DStart)
-  (let ((struct (aref DataStruct DStart)))
-    (cond ((and (typep struct 'vector) (>= (length struct) (1+ size)))
+(defun get-or-allocate-TC_Struct (size DataStruct dStart isStruct)
+  (let ((struct (aref DataStruct dStart)))
+    (cond ((and (typep struct 'vector) (= (length struct) (1+ size)))
 	   struct) ; already allocated
-	  (T (setq struct (make-TC_Struct size))
-	     (setf (aref DataStruct DStart) struct)
+	  (t (setq struct (or (and isStruct (make-data-struct-from-parent
+					     DataStruct dStart))
+			      (make-TC_Struct size)))
+	     (setf (aref DataStruct dStart) struct)
 	     struct))))
 
 ;;; Actual array dimensions are "compatible" with the required dimensions 
@@ -457,20 +438,28 @@
   (and (>= (first actual-dimensions) (first required-dimensions))
        (equal (cdr actual-dimensions) (cdr required-dimensions))))
 
-(defun get-or-allocate-array (array_dimensions element_type DataStruct DStart)
-  (let ((array (aref DataStruct DStart)))
+(defun get-or-allocate-array (array_dimensions element_type DataStruct dStart)
+  (let ((array (aref DataStruct dStart)))
     (cond ((and (typep array 'array) 
 		(subtypep element_type (array-element-type array))
 		(compatible-array (array-dimensions array) array_dimensions))
 	   array) ; already allocated
-	  (T (setq array
+	  (t (setq array
 		   (make-array array_dimensions :element-type element_type))
-	     (setf (aref DataStruct DStart) array)
+	     (setf (aref DataStruct dStart) array)
 	     ;;(format t "Allocate Array ~A ~A~%" array_dimensions element_type)
 	     array))))
 
-(defun TransferToDataStructure (format dataStruct dStart buffer parentFormat)
-  (let ((currentData DStart) (type (formatType format)))
+(defun allocate-named-struct-if-possible (dataStruct index dStart nextFormat
+					  parentFormat parentIsStruct)
+  (when (and parentFormat parentIsStruct (null (aref dispVector index))
+	     (eql (formatType nextFormat) StructFMT))
+    (setf (aref dispVector index)
+      (make-data-struct-from-parent dataStruct dStart))))
+
+(defun TransferToDataStructure (format dataStruct dStart buffer parentFormat
+				&optional isArray)
+  (let ((currentData dStart) (type (formatType format)))
     (cond ((eql type LengthFMT) 
 	   (Explicit-Format-Error))
 
@@ -478,16 +467,16 @@
            (let ((formatProc (aref TransTable (formatPrimitiveProc format))))
 	     (funcall formatProc Decode dataStruct currentData buffer)
              (incf currentData 
-		   (funcall formatProc ALength NIL LISP_STRUCT_START NIL)))) 
+		   (funcall formatProc ALength nil LISP_STRUCT_START nil)))) 
 
           ((eql type PointerFMT)
-           (let ((ptrVal (formatGetChar buffer)))
-             (cond ((eql ptrVal (character 0))
-		    (setf (aref dataStruct currentData) NIL))
-		   (T (let ((nextFormat (formatChoosePtrFormat format
+           (let ((ptrVal (formatGetByte buffer)))
+             (cond ((not (eql ptrVal (char-int #\Z)))
+		    (setf (aref dataStruct currentData) nil))
+		   (t (let ((nextFormat (formatChoosePtrFormat format
 							       parentFormat)))
 			(TransferToDataStructure nextFormat dataStruct
-						 currentData buffer NIL)))))
+						 currentData buffer nil)))))
 	   (incf currentData STRUCT_ELEM_SIZE))
 
 	  ((eql type StructFMT)
@@ -495,7 +484,8 @@
 		 (structStart LISP_STRUCT_START)
 		 (new_struct
 		  (get-or-allocate-TC_Struct (DataStructureSize format)
-					     dataStruct currentData)))
+					     dataStruct currentData
+					     (not isArray))))
 	     (doStructFormat (i formatArray)
 	       (incf structStart 
 		     (TransferToDataStructure
@@ -511,21 +501,24 @@
 		  (elementType (findSimpleType nextFormat))
 		  (elementSize (findSimpleTypeSize nextFormat))
 		  (array (get-or-allocate-array arrayDimensions
-						(or elementType T)
+						(or elementType t)
 						dataStruct currentData))
 		  (dispVector (displaced_vector array)))
 	     (cond ((and elementSize
-			 #+:ACLPC(not (eq (array-element-type dispVector)
+			 #+:aclpc(not (eq (array-element-type dispVector)
 					  'character))
 			 (eql (msgByteOrder) (hostByteOrder))
 			 (equal (array-element-type dispVector)
 				(findSimpleType nextFormat)))
 		    (blockCopyToArray buffer dispVector 
 				      (* elementSize arraySize)))
-		   (T 
+		   (t 
 		    (dotimes (i arraySize)
+		      (allocate-named-struct-if-possible 
+		       dataStruct i dStart nextFormat
+		       parentFormat (not isArray))
 		      (TransferToDataStructure nextFormat dispVector
-					       i buffer NIL)))))
+					       i buffer nil t)))))
 	   (incf currentData STRUCT_ELEM_SIZE))
 
 	  ((eql type VarArrayFMT)
@@ -534,20 +527,20 @@
 		  (arraySize (formatGetInt buffer))
 		  arrayDimensions)
 	     (cond ((zerop arraySize)
-		    (setf (aref dataStruct currentData) NIL))
-		   (T (cond ((> (formatFormatArrayMax formatArray) 3)
+		    (setf (aref dataStruct currentData) nil))
+		   (t (cond ((> (formatFormatArrayMax formatArray) 3)
 			     ;; multi-dimensional array
 			     (setq arrayDimensions
 				   (varArrayDimensions formatArray parentFormat
 						       dataStruct currentData))
 			     (unless (= arraySize (apply #'* arrayDimensions))
 			       (error "variable length array dimensions don't match")))
-			    (T (setq arrayDimensions (list arraySize))))
+			    (t (setq arrayDimensions (list arraySize))))
 
 		      (let* ((elementType (findSimpleType nextFormat))
 			     (elementSize (findSimpleTypeSize nextFormat))
 			     (array (get-or-allocate-array
-				     arrayDimensions (or elementType T)
+				     arrayDimensions (or elementType t)
 				     dataStruct currentData))
 			     (dispVector (displaced_vector array)))
 			(cond ((and elementSize
@@ -556,14 +549,17 @@
 					   (findSimpleType nextFormat)))
 			       (blockCopyToArray buffer dispVector 
 						 (* elementSize arraySize)))
-			      (T
+			      (t
 			       (dotimes (i arraySize)
+				 (allocate-named-struct-if-possible 
+				  dataStruct i dStart nextFormat
+				  parentFormat (not isArray))
 				 (TransferToDataStructure nextFormat dispVector
-							  i buffer NIL))))))))
+							  i buffer nil t))))))))
 	   (incf currentData STRUCT_ELEM_SIZE))
 
 	  ((eql type NamedFMT)
-	   (transferToDataStructure (findNamedFormat format) 
+	   (TransferToDataStructure (findNamedFormat format) 
 				    dataStruct dStart buffer parentFormat)
 	   (incf currentData STRUCT_ELEM_SIZE))
 
@@ -573,7 +569,7 @@
 		   (or (getNthEnum format enumVal) enumVal))
 	     (incf currentData STRUCT_ELEM_SIZE))))
 
-    (- currentData DStart)))
+    (- currentData dStart)))
 
 ;;;*************************************************************
 ;;;
@@ -588,17 +584,17 @@
 ;;; These routines simplify the creation and management of such enclosing 
 ;;; structures.
 ;;;
-(defvar enclosing-structs NIL)
+(defvar enclosing-structs nil)
 
 ;;; Structures sent as data via IPC must be of type "vector" so that formatter
 ;;;    functions can access their fields without having to know the names of
 ;;;    their accessor functions (Reid)
-#+(OR ALLEGRO-V4.0 :ACLPC :MCL)
+#+(or allegro-v4.0 :aclpc :MCL)
 (defmacro IPC_defstruct ((name &rest args) &body fields)
   `(progn (defstruct (,name ,@args (:type vector) :named) ,@fields)
 	  (deftype ,name () '(or vector NULL))))
 
-#+(AND ALLEGRO (NOT ALLEGRO-V4.0))
+#+(and allegro (not allegro-v4.0))
 (defmacro IPC_defstruct ((name &rest args) &body fields)
   `(defstruct (,name ,@args (:type vector) :named) ,@fields))
 
@@ -619,7 +615,7 @@
 	   (setq enclosing-structs (encl-struct-element enclosing-structs))
 	   (setf (encl-struct-element enclosing-struct) element)
 	   enclosing-struct))
-	(T (make-encl-struct :element element))))
+	(t (make-encl-struct :element element))))
 
 (defun free-enclosing-struct (enclosing-struct)
   (setf (encl-struct-element enclosing-struct) enclosing-structs)
@@ -628,9 +624,9 @@
 ;;;*************************************************************
 
 (defun BufferSize (Format DataStruct)
-  (cond ((= format 0) 0)
-	(T (BufferSize1 Format (enclose-struct DataStruct)
-			LISP_STRUCT_START NIL))))
+  (cond ((zerop (ff:foreign-pointer-address Format)) 0)
+	(t (BufferSize1 Format (enclose-struct DataStruct)
+			LISP_STRUCT_START nil))))
 
 ;;;*************************************************************
 ;;;
@@ -646,14 +642,15 @@
 
 (defun EncodeData (format dataStruct buffer)
   (TransferToBuffer format (enclose-struct dataStruct)
-		    LISP_STRUCT_START buffer NIL))
+		    LISP_STRUCT_START buffer nil))
 
 ;;;*************************************************************
 
 (defun DecodeData (format buffer &optional dataStruct)
-  (unless dataStruct (setq dataStruct (make-TC_Struct 1)))
   (when format
-    ;; no need to allocate decoded struct, done within "TransferToDataStructure"
-    (TransferToDataStructure format dataStruct LISP_STRUCT_START Buffer NIL))
-  (aref dataStruct LISP_STRUCT_START))
-
+    (let ((object (make-TC_Struct 1)))
+      ;; If no dataStruct, no need to allocate: done within
+      ;;   "TransferToDataStructure"
+      (when dataStruct (setf (aref object LISP_STRUCT_START) dataStruct))
+      (TransferToDataStructure format object LISP_STRUCT_START buffer nil)
+      (aref object LISP_STRUCT_START))))

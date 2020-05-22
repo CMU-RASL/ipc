@@ -19,6 +19,17 @@
  * REVISION HISTORY:
  *
  * $Log: formatters.c,v $
+ * Revision 2.9  2013/11/22 16:57:29  reids
+ * Checking whether message is registered no longer caches indication that
+ *   one is interested in publishing that message.
+ * Direct messaging now respects the capacity constraints of a module.
+ * Added capability to send and receive messages in "raw" (byte array) mode.
+ * Made global_vars receive and send "raw" data.
+ * Check pending limit constraints when they are first declared.
+ * Eliminated some extraneous memory allocations.
+ * Fixed bug in direct mode where messages that did not have a handler were
+ *   being sent to central, anyways.
+ *
  * Revision 2.8  2009/09/04 19:12:57  reids
  * Port for ARM
  *
@@ -426,8 +437,8 @@
  *    Dec-88 Christopher Fedor at School of Computer Science, CMU
  * created.
  *
- * $Revision: 2.8 $
- * $Date: 2009/09/04 19:12:57 $
+ * $Revision: 2.9 $
+ * $Date: 2013/11/22 16:57:29 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -1108,7 +1119,7 @@ int32 x_ipc_enumToInt (CONST_FORMAT_PTR format,
  * OUTPUTS: int
  *
  *****************************************************************************/
-
+#if 0
 static int32 x_ipc_elementSize(CONST_FORMAT_PTR format)
 {
   int32 firstSize, i;
@@ -1154,7 +1165,7 @@ static int32 x_ipc_elementSize(CONST_FORMAT_PTR format)
   }
   return 0;
 }
-
+#endif
 
 /*****************************************************************************
  *
@@ -1442,7 +1453,7 @@ BOOLEAN formatsEqual(CONST_FORMAT_PTR format1, CONST_FORMAT_PTR format2)
  * OUTPUTS: int
  *
  *****************************************************************************/
-
+#if 0
 static BOOLEAN x_ipc_canVectorize(CONST_FORMAT_PTR format)
 { 
   int32 i, offset=0;
@@ -1489,7 +1500,7 @@ static BOOLEAN x_ipc_canVectorize(CONST_FORMAT_PTR format)
   }
   return FALSE;
 }
-
+#endif
 
 /*****************************************************************************
  *

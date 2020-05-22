@@ -1,7 +1,7 @@
 #############################################################################
-#       $Id: GNUmakefile,v 1.8 2009/09/04 19:11:20 reids Exp $
-# $Revision: 1.8 $
-#     $Date: 2009/09/04 19:11:20 $
+#       $Id: GNUmakefile,v 1.10 2013/07/31 02:03:21 reids Exp $
+# $Revision: 1.10 $
+#     $Date: 2013/07/31 02:03:21 $
 #   $Author: reids $
 #    $State: Exp $
 #   $Locker:  $
@@ -26,6 +26,12 @@
 # HISTORY:
 #
 # $Log: GNUmakefile,v $
+# Revision 1.10  2013/07/31 02:03:21  reids
+# Fixed the path to shared library
+#
+# Revision 1.9  2013/07/23 21:11:38  reids
+# Updated for using SWIG
+#
 # Revision 1.8  2009/09/04 19:11:20  reids
 # IPC Java is now in its own package
 #
@@ -116,13 +122,28 @@ PUBLIC_DOCS		=
 MODULE_INCS		= 
 MODULE_DOCS		= 
 
-install_libs		:: formatters.class primFmttrs.class IPC.class
+_SWIG_GEN		= IPCConstants IPC_ERROR_TYPE IPCJNI IPC_RETURN_TYPE \
+			  IPC_VARCONTENT_TYPE IPC_VERBOSITY_TYPE \
+			  BUFFER_TYPE FORMAT_TYPE MSG_INSTANCE IPC_CONTEXT\
+			  SWIGTYPE_p_fd_set SWIGTYPE_p_void \
+			  FORMATTER_CONTAINER_TYPE TIMER_REF_CONTAINER_TYPE \
+			  SWIGTYPE_p_f_p_struct__X_IPC_REF_p_void_p_void__void
+SWIG_GEN_SRCS		= $(patsubst %,%.java,$(_SWIG_GEN))
+SWIG_GEN_CLASSES	= $(patsubst %,%.class,$(_SWIG_GEN))
+
+install_libs		:: CLASSES
+
+CFLAGS			+= -fno-strict-aliasing
+
 CFLAGS			+= -fPIC -O2
-INC_PATH		+= -I/usr/java/jdk1.3.1/include -I../include
+ifndef JAVA_INC_DIR
+JAVA_INC_DIR		= /usr/java/jdk1.3.1/include
+endif
+INC_PATH		+= -I$(JAVA_INC_DIR) -I../include
 
 # Needed for jni_md.h
 ifeq ($(THIS_OS),Linux)
-INC_PATH		+= -I/usr/java/jdk1.3.1/include/linux
+INC_PATH		+= -I$(JAVA_INC_DIR)/linux
 else
 ifeq ($(THIS_MACHINE),sun4u)
 INC_PATH		+= -I/usr/java/include -I/usr/java/include/solaris
@@ -132,7 +153,10 @@ INC_PATH		+= -I/usr/local/include
 endif
 endif
 endif
-INC_PATH		+= -I./build/ipc/java
+
+BUILD_DIR		= build/ipc/java
+
+INC_PATH		+= -I./$(BUILD_DIR)
 INC_PATH		+= -I../src
 
 INCS			= $(MODULE_INCS) $(PUBLIC_INCS)
@@ -140,13 +164,14 @@ INCS			= $(MODULE_INCS) $(PUBLIC_INCS)
 # Generated files - not installed
 PRIVS	= 
 
-_OBJS = ipcjava.o
+_OBJS = IPC_wrap.o
 
 OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 
 # Source files - not installed
 
-SRCS            = ipcjava.c formatters.java primFmttrs.java IPC.java
+JAVA_SRCS	= IPC.java formatters.java primFmttrs.java ipcJava.java
+SRCS            = IPC.i ipcJava.h ipcJava.c $(JAVA_SRCS)
 
 PRIVATE_INCS	= 
 
@@ -160,12 +185,14 @@ LOCAL_LIBS	= $(patsubst %,$(LDIR)/%,$(PUBLIC_LIBS))
 LOCAL_BINS	= 
 
 # Files to be removed by 'make clean' and 'make realclean'
-DELETES		= core* $(DEPEND_FILE) \
+DELETES		= core $(DEPEND_FILE) \
 	  	  $(LOCAL_BINS) $(LOCAL_LIBS) $(PUBLIC_LINTS) \
 		  $(MODULE_LIBS) $(MODULE_LINTS) $(PRIVS) $(OBJS) make.state \
 		  $(wildcard .nse_dep*) $(wildcard *.CKP) \
 		  $(wildcard *~) $(wildcard .*~) $(wildcard *.CKP)\
-	          $(wildcard *.BAK) $(wildcard .*.BAK) *.class $(GEN_HEADERS)
+	          $(wildcard *.BAK) $(wildcard .*.BAK) *.class $(GEN_HEADERS) \
+		  IPC.java IPC_wrap.c IPC_wrap.h $(SWIG_GEN_SRCS) \
+		  $(BUILD_DIR)/*
 
 # Files never to be removed, even if Make encounters an error
 .PRECIOUS: $(SRCS_ALL) $(SUBDIRS)
@@ -201,31 +228,29 @@ all:: srcs libs bins privs
 #  $(ODIR)/combined.o: $(ODIR)/part1.o $(ODIR)/part2.o
 #	$(LD) -r -o $@ $(ODIR)/part1.o $(ODIR)/part2.o; chmod a-x $@
 
-$(ODIR)/ipcjava.o : IPC.h formatters.h primFmttrs.h
+IPC_wrap.c : IPC.i ../src/ipcFFI.h ../src/ipcFFI.c ipcJava.h ipcJava.c
+	swig -java $(INC_PATH) -outcurrentdir -o $@ -package "ipc.java" $<
 
-GEN_HEADERS = IPC.h formatters.h primFmttrs.h \
-	IPC_*.h formatters_*.h primFmttrs_*.h
-
-CLASS_DIR = ./build/ipc/java
-
-IPC.h : IPC.java
-	javah -classpath build -force -jni -o $(CLASS_DIR)/IPC.h ipc.java.IPC
-
-formatters.h : formatters.java
-	javah -classpath build -force -jni -o $(CLASS_DIR)/formatters.h ipc.java.formatters
-
-primFmttrs.h : primFmttrs.java
-	javah -classpath build -force -jni -o $(CLASS_DIR)/primFmttrs.h ipc.java.primFmttrs
-
-%.class : %.java
+CLASSES : IPC_wrap.c $(JAVA_SRCS) $(SWIG_GEN_SRCS)
 	$(MKDIR) build
-	javac -classpath ../.. -d build $<
+	javac -classpath build -d build $(JAVA_SRCS) $(SWIG_GEN_SRCS)
 
+IPC_wrap.h : IPC_wrap.c
+	javah -classpath build -force -jni -o IPC_wrap.h ipc.java.IPCJNI
+
+$(ODIR)/IPC_wrap.o : IPC_wrap.h
+
+ifeq ($(THIS_OS),wnt)
 $(LDIR)/$(JAVALIB): $(OBJS)
 	$(RM) $@
 	$(LD_SHARED) -o $@ $(OBJS) $(LIB_PATH) -lipc
-
-#	$(CC) -g -shared -Wl,-soname,$(JAVALIB) -o $@ $(OBJS) $(LIB_PATH) -lipc
+else
+$(LDIR)/$(JAVALIB): $(OBJS) $(PUBLIC_LIB_DIR)/libipc.a
+	$(RM) $@
+	cd ../src; $(MAKE) MAKE_SHARED_LIBS=1 install; cd ../java
+	$(LD_SHARED) -o $@ $(OBJS) \
+	  $(PWD)/$(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR)
+endif
 
 $(PUBLIC_LIB_DIR)/$(JAVALIB): $(OBJS)
 

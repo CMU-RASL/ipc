@@ -7,8 +7,8 @@
  #
  # ABSTRACT: Stand-alone test program for Python version of IPC.
  #
- # $Revision: 2.1 $
- # $Date: 2011/08/16 16:00:07 $
+ # $Revision: 2.2 $
+ # $Date: 2013/07/24 20:01:01 $
  # $Author: reids $
  #
  # Copyright (c) 2008, Carnegie Mellon University
@@ -18,11 +18,15 @@
  # REVISION HISTORY
  #
  # $Log: ipcTest1.py,v $
+ # Revision 2.2  2013/07/24 20:01:01  reids
+ # Updating lisp, java, python test programs to adhere to updated API
+ #
  # Revision 2.1  2011/08/16 16:00:07  reids
  # Adding Python test programs
  #
  ################################################################/
 
+from primFmttrs import *
 from IPC import *
 import sys
 
@@ -54,7 +58,8 @@ MATRIX_LIST_FORMAT = "{[float:2,2], string, int, *!}"
 MATRIX_FORMAT =      "[float:2,2]"
 
 def msg1Handler (msgRef, callData, clientData) :
-  (obj, ret) = IPC_unmarshall(IPC_msgInstanceFormatter(msgRef), callData)
+  (obj, ret) = IPC_unmarshallData(IPC_msgInstanceFormatter(msgRef), callData,
+                                  str)
   print "msg1Handler: Receiving message %s of %d bytes (%s/%s) [%s]" % \
         (IPC_msgInstanceName(msgRef), IPC_dataLength(msgRef),
          obj, callData, clientData)
@@ -70,7 +75,7 @@ def msg3Handler (msgRef, callData, clientData) :
   print "msg3Handler: Receiving message %s: " % IPC_msgInstanceName(msgRef),
   # Get the formatter for this message instance
   formatter = IPC_msgInstanceFormatter(msgRef)
-  (obj, ret) = IPC_unmarshall(formatter, callData)
+  (obj, ret) = IPC_unmarshallData(formatter, callData, MATRIX_LIST_TYPE)
   IPC_printData(formatter, sys.stdout, obj)
   # Free up malloc'd data
   IPC_freeByteArray(callData)
@@ -179,6 +184,7 @@ def main () :
   # Define a variable length message (simple format string)
   print "\nIPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % (MSG2, STRING_FORMAT)
   IPC_defineMsg(MSG2, IPC_VARIABLE_LENGTH, STRING_FORMAT)
+  IPC_msgClass(MSG2, str)
 
   print "\nIPC_isMsgDefined(%s) => %s" % (MSG1, IPC_isMsgDefined(MSG1))
   print "\nIPC_isMsgDefined(%s) => %s"  % (MSG3, IPC_isMsgDefined(MSG3))
@@ -188,7 +194,7 @@ def main () :
   IPC_subscribe(MSG1, msg1Handler, "client1a")
   # Subscribe to the second message, with automatic unmarshalling and
   # passing along client data
-  print "\nIPC_subscribeData(%s, msg1Handler, %s)" % (MSG2, "client2a")
+  print "\nIPC_subscribeData(%s, msg2Handler, %s)" % (MSG2, "client2a")
   IPC_subscribeData(MSG2, msg2Handler, "client2a")
 
   IPC_listenClear(1000) # Give chance for central to update information
@@ -280,6 +286,7 @@ def main () :
   print "\nIPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % \
         (QUERY_MSG, STRING_FORMAT)
   IPC_defineMsg(QUERY_MSG, IPC_VARIABLE_LENGTH, STRING_FORMAT)
+  IPC_msgClass(QUERY_MSG, str)
 
   # This call allows IPC to send the process 2 messages at a time, rather than
   #  queueing them in the central server.
@@ -338,9 +345,9 @@ def main () :
   IPC_marshall(IPC_parseFormat(SAMPLE_FORMAT), sample, varcontent)
   print "Marshall of 'sample' [length: %d]" % varcontent.length
     
-  print "\nIPC_unmarshall(...)"
-  (sample2, ret) = IPC_unmarshall(IPC_parseFormat(SAMPLE_FORMAT),
-                                  varcontent.content, oclass=SAMPLE_TYPE)
+  print "\nIPC_unmarshallData(...)"
+  (sample2, ret) = IPC_unmarshallData(IPC_parseFormat(SAMPLE_FORMAT),
+                                      varcontent.content, SAMPLE_TYPE)
   print "Orig: <%d, %s, %f>\nCopy: <%d, %s, %f>" % \
         (sample.i1, sample.str1, sample.d1,
          sample2.i1, sample2.str1, sample2.d1)
@@ -426,6 +433,7 @@ def main () :
   print "\nIPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % \
         (QUERY2_MSG, MATRIX_LIST_FORMAT)
   IPC_defineMsg(QUERY2_MSG, IPC_VARIABLE_LENGTH, MATRIX_LIST_FORMAT)
+  IPC_msgClass(QUERY2_MSG, MATRIX_LIST_TYPE)
   # Define the "response" message 
   print "\nIPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % \
         (RESPONSE2_MSG, MATRIX_FORMAT)
@@ -433,7 +441,7 @@ def main () :
 
   # Subscribe to query message with automatic unmarshalling 
   print "\nIPC_subscribeData(%s, query2Handler, None)" % QUERY2_MSG
-  IPC_subscribeData(QUERY2_MSG, query2Handler, None, MATRIX_LIST_TYPE)
+  IPC_subscribeData(QUERY2_MSG, query2Handler, None)
 
   # Set up a sample MATRIX_LIST structure 
   k = 0
