@@ -129,7 +129,7 @@ SRCS	=
 
 PRIVATE_INCS	= 
 
-MISC		=  GNUmakefile README LICENSE.TXT
+MISC		=  GNUmakefile README.md LICENSE.TXT
 
 ##########
 # Default Target

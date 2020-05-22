@@ -2,7 +2,7 @@
 Copyright (c) 2020, Carnegie Mellon University  
 This software is distributed under the terms of the Simplified BSD License (see [LICENSE.TXT](LICENSE.TXT))
 
-Current Version: **3.9.1**
+Current Version: **3.10.2**
 
 This repository is a mirror of the source code released at [http://www.cs.cmu.edu/~ipc/](http://www.cs.cmu.edu/~ipc/).
 
