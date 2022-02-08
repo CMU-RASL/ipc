@@ -64,6 +64,11 @@ sharedObj/
 # Ignore build files
 /include/
 /lib/
+*~
+#*#
+__pycache__
+IPC.py
+IPC_wrap.c
 
 #Ignore VS Code 
 .vscode/

@@ -183,8 +183,6 @@ LINUX_MAJOR_VERSION_CMD := $(PERL) -e '$$_ = shift @ARGV; ($$major,$$minor,$$pat
 THIS_RELEASE := $(shell $(LINUX_MAJOR_VERSION_CMD) $(THIS_RELEASE))
 endif
 
-THIS_OS_BOTH := $(THIS_OS)-$(THIS_RELEASE)
-
 #############################################################################
 # Release configuration.
 #############################################################################
@@ -210,20 +208,20 @@ CVSROOT 	= /afs/cs/project/TCA/Master
 endif
 
 # places where files live, relative to the makefile :
-BDIR    = bin/$(THIS_OS_BOTH)
-LDIR    = lib/$(THIS_OS_BOTH)
-ODIR    = obj/$(THIS_OS_BOTH)
+BDIR    = bin
+LDIR    = lib
+ODIR    = obj
 VODIR   = vxObj
-SODIR   = sharedObj/$(THIS_OS_BOTH)
+SODIR   = sharedObj
 PWD 	:= $(shell /bin/pwd)
 
 #############################################################################
 # Standard directories
 #############################################################################
 
-PUBLIC_BIN_DIR		= $(INSTALL_DIR)/bin/$(THIS_OS_BOTH)
+PUBLIC_BIN_DIR		= $(INSTALL_DIR)/bin
 PUBLIC_INC_DIR 		= $(INSTALL_DIR)/include
-PUBLIC_LIB_DIR		= $(INSTALL_DIR)/lib/$(THIS_OS_BOTH)
+PUBLIC_LIB_DIR		= $(INSTALL_DIR)/lib
 PUBLIC_LINT_DIR		= $(INSTALL_DIR)/lib/lint
 PUBLIC_MAN_DIR		= $(INSTALL_DIR)/man/man
 PUBLIC_DOC_DIR		= $(INSTALL_DIR)/doc
