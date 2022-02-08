@@ -1,3 +1,4 @@
+/*
 ##############################################################################
 # PROJECT: IPC (Interprocess Communication) Package
 #
@@ -35,13 +36,13 @@
 # Adding Python interface to IPC
 #
 ################################################################
-
+*/
 %pythoncode %{
 # ipc passes IPC_WAIT_FOREVER = -1 as an unsigned int which breaks SWIG
-IPC_WAIT_FOREVER = 4294967295L
+IPC_WAIT_FOREVER = 4294967295
 # ipc passes IPC_VARIABLE_LENGTH = -1 as an unsigned int which breaks SWIG
-IPC_VARIABLE_LENGTH = 4294967295L
-IPC_FIXED_LENGTH = 4294967294L
+IPC_VARIABLE_LENGTH = 4294967295
+IPC_FIXED_LENGTH = 4294967294
 
 msgHashTable = {}
 fdHashTable = {}
@@ -54,7 +55,7 @@ disconnectHandlers = []
 handlerNumber = 0
 
 # Specific exception for internal IPC errors
-class Error(StandardError) :
+class Error(Exception) :
   def __init__(self, value) : self.value = value;
   def __str__(self) : return repr(self.value)
 
@@ -167,7 +168,7 @@ def IPC_unsubscribeFD (fd, handler) :
     del fdHashTable[id(handler)]
     return unsubscribeFD(fd)
   except :
-    print "Ooops: %s not subscribed for fd %d" % (handler.__name__, fd)
+    print("Ooops: %s not subscribed for fd %d" % (handler.__name__, fd))
     return IPC_Error
 
 def IPC_subscribeConnect (connectHandler, clientData=None) :
@@ -178,8 +179,8 @@ def IPC_subscribeConnect (connectHandler, clientData=None) :
   if (hndData is None) :
     connectHandlers.append([connectHandler, clientData])
   elif (hndData[1] != clientData) :
-    print "WARNING: Replacing connect handler client data for",\
-          connectHandler.__name__
+    print("WARNING: Replacing connect handler client data for",
+          connectHandler.__name__)
     hndData[1] = clientData
 
   if (oldLen == 0 and len(connectHandlers) == 1) :
@@ -194,8 +195,8 @@ def IPC_subscribeDisconnect (disconnectHandler, clientData=None) :
   if (hndData is None) :
     disconnectHandlers.append([disconnectHandler, clientData])
   elif (hndData[1] != clientData) :
-    print "WARNING: Replacing disconnect handler client data for", \
-          disconnectHandler.__name__
+    print("WARNING: Replacing disconnect handler client data for",
+          disconnectHandler.__name__)
     hndData[1] = clientData
 
   if (oldLen == 0 and len(disconnectHandlers) == 1) :
@@ -206,8 +207,8 @@ def IPC_subscribeDisconnect (disconnectHandler, clientData=None) :
 def IPC_unsubscribeConnect (connectHandler) :
   hndData = findExisting(connectHandler, connectHandlers)
   if (hndData is None) :
-    print "IPC_unsubscribeConnect: Connect handler %s not found " % \
-    	  connectHandler.__name__
+    print("IPC_unsubscribeConnect: Connect handler %s not found " 
+          %connectHandler.__name__)
     return IPC_Error
   else :
     connectHandlers.remove(hndData)
@@ -218,8 +219,8 @@ def IPC_unsubscribeConnect (connectHandler) :
 def IPC_unsubscribeDisconnect (disconnectHandler) :
   hndData = findExisting(disconnectHandler, disconnectHandlers)
   if (hndData is None) :
-    print "IPC_unsubscribeConnect: Disconnect handler %s not found " % \
-    	  connectHandler.__name__
+    print("IPC_unsubscribeConnect: Disconnect handler %s not found "
+    	  %connectHandler.__name__)
     return IPC_Error
   else :
     disconnectHandlers.remove(hndData)
@@ -241,8 +242,8 @@ def IPC_subscribeHandlerChange (msgName, changeHandler, clientData=None) :
   if (hndData is None) :
     msgChangeHandlers.append([changeHandler, clientData])
   elif (hndData[1] != clientData) :
-    print "WARNING: Replacing change handler client data for",\
-          changeHandler.__name__
+    print("WARNING: Replacing change handler client data for",
+          changeHandler.__name__)
     hndData[1] = clientData
 
   if (oldLen == 0 and len(msgChangeHandlers) == 1) :
@@ -255,12 +256,12 @@ def IPC_unsubscribeHandlerChange (msgName, changeHandler) :
   try :
     msgChangeHandlers = hndChangeTable[msgName]
   except KeyError :
-    print "No change handler found for message", msgName
+    print("No change handler found for message", msgName)
     return IPC_Error
 
   hndData = findExisting(changeHandler, msgChangeHandlers)
   if (hndData is None) :
-    print "No change handler found for message", msgName
+    print("No change handler found for message", msgName)
     return IPC_Error
   else :
     msgChangeHandlers.remove(hndData);
@@ -373,7 +374,7 @@ def IPC_queryResponseData (msgName, data, timeoutMSecs) :
 						      oclass=responseClass)
         if (vc.content != 0) : IPC_freeByteArray(vc.content)
     else : return (None, IPC_Error)
-  except : print exc_info(); return (None, IPC_Error)
+  except : print(exc_info()); return (None, IPC_Error)
   return (responseObject, ret)
 
 # This is pretty arcane...
@@ -411,7 +412,7 @@ def IPC_addTimer (tdelay, count, handler, clientData=None) :
   try:
     hndIndex = timerHashTable[handler]
     removeTimer(hndIndex)
-    print "Replacing existing timer for handler", handler.__name__
+    print("Replacing existing timer for handler", handler.__name__)
   except: pass
   return addTimer(tdelay, count, handler, clientData, None)
 
@@ -432,7 +433,7 @@ def IPC_removeTimer (handler) :
     _IPC.IPC_removeTimerByRef(timerData[2])
     removeTimer(hndIndex)
   except:
-    print "Timer for handler (%s) does not exist" % handler.__name__
+    print("Timer for handler (%s) does not exist" % handler.__name__)
 
   return IPC_OK
 
@@ -446,7 +447,7 @@ def IPC_removeTimerByRef (timerRef) :
         removeTimer(hndIndex)
         return IPC_OK  
   # No matching timerRef found 
-  print "Timer with ref (%s) does not exist" % timerRef.timerRef
+  print("Timer with ref (%s) does not exist" % timerRef.timerRef)
   return IPC_OK
 
 def getMsgClass (msgName, formatter) :
@@ -454,14 +455,14 @@ def getMsgClass (msgName, formatter) :
   else :
     try : return msgClassHashTable[msgName]
     except :
-      print "WARNING: Missing class associated with message %s" % msgName
+      print("WARNING: Missing class associated with message %s" % msgName)
       return None
     
 def msgCallbackHandler (msgInstance, byteArray, key) :
   global msgHashTable
   try : handlerData = msgHashTable[key]
   except : 
-    print "Ooops -- no handler for %s" % IPC_msgInstanceName(msgInstance)
+    print("Ooops -- no handler for %s" % IPC_msgInstanceName(msgInstance))
     handlerData = None
 
   if (not handlerData is None) :
@@ -478,16 +479,16 @@ def msgCallbackHandler (msgInstance, byteArray, key) :
       else :
         handlerData[0](msgInstance, byteArray, handlerData[1])
     except: 
-      print "Handler failed: %s: %s" % \
-            (exc_info()[0].__name__, exc_info()[1].message)
+      print("Handler failed: %s: %s" % \
+            (exc_info()[0].__name__, exc_info()[1].message))
       raise
 
 def queryCallbackHandler (msgInstance, byteArray, key) :
   global queryHashTable
   try : handlerData = queryHashTable[key]
   except : 
-    print "Ooops -- no query notification handler for %s" % \
-          IPC_msgInstanceName(msgInstance)
+    print("Ooops -- no query notification handler for %s"
+          % IPC_msgInstanceName(msgInstance))
     handlerData = None
 
   if (not handlerData is None) :
@@ -505,8 +506,8 @@ def queryCallbackHandler (msgInstance, byteArray, key) :
       else :
         handlerData[0](msgInstance, byteArray, handlerData[1])
     except: 
-      print "Handler failed: %s: %s" % \
-            (exc_info()[0].__name__, exc_info()[1].message)
+      print("Handler failed: %s: %s"
+            %(exc_info()[0].__name__, exc_info()[1].message))
       raise
 
 
@@ -514,7 +515,7 @@ def fdCallbackHandler (fd, key) :
   try :
     handlerData = fdHashTable[key]
   except : 
-    print "Ooops -- no handler for fd %d" % fd
+    print("Ooops -- no handler for fd %d" % fd)
     handlerData = None
 
   if (not handlerData is None) :
@@ -526,10 +527,10 @@ def timerCallbackHandler (hndIndex, currentTime, scheduledTime) :
     timerData[0](timerData[1], currentTime, scheduledTime)
     numTriggers = maxTriggers(timerData[2])
     if (numTriggers == 0) :
-      print "Deleting timer", timerData[0].__name__
+      print("Deleting timer", timerData[0].__name__)
       removeTimer(hndIndex)
   except:
-    print "Ooops -- no handler for timer", exc_info()
+    print("Ooops -- no handler for timer", exc_info())
 
 def connectCallbackHandler (moduleName) :
   global connectHandlers
@@ -545,7 +546,7 @@ def changeCallbackHandler (msgName, numHandlers) :
   try :
     msgChangeHandlers = hndChangeTable[msgName]
   except KeyError :
-    print "Ooops -- no change handlers for message", msgName
+    print("Ooops -- no change handlers for message", msgName)
     return
 
   for hndData in msgChangeHandlers :

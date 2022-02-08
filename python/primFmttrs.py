@@ -500,7 +500,7 @@ class UINT_Trans(TransFormat) :
     _IPC.decodeUIntArray(array, len, buffer)
 
 class LONG_Trans(TransFormat) :
-  def __init__(self) : self.typeSize = LONG_SIZE; self.primType = long
+  def __init__(self) : self.typeSize = LONG_SIZE; self.primType = int
 
   def Encode (self, dataStruct, dstart, buffer) :
     theLong = getLongField(dataStruct, dstart)

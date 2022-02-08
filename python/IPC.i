@@ -31,7 +31,7 @@
  * Revision 1.1  2011/08/16 16:00:36  reids
  * Adding Python interface to IPC
  *
- ****************************************************************/	
+ ****************************************************************/
 
 /**********************************************************************
  * INCLUDES
@@ -47,7 +47,13 @@
 // the underlying C functions are available to the wrapper functions.
 
 #include "ipc.h"
-extern void SWIG_init(void); // To prevent compiler from complaining
+extern
+#if PY_VERSION_HEX >= 0x03000000
+PyObject*
+#else
+void
+#endif
+PyInit__IPC(void); // To prevent compiler from complaining
 
 #define NMP_IPC
 #define NEED_DEBUGGING
@@ -66,7 +72,7 @@ extern void SWIG_init(void); // To prevent compiler from complaining
   if (PyErr_Occurred() != NULL) SWIG_fail;
 }
 
-# Functions that are rewritten for the Python version of IPC (see ipcPython.py)
+// Functions that are rewritten for the Python version of IPC (see ipcPython.py)
 %ignore IPC_subscribe;
 %ignore IPC_subscribeData;
 %ignore IPC_unsubscribe;

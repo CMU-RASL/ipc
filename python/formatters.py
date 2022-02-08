@@ -32,7 +32,10 @@
 import primFmttrs
 import _IPC
 from _IPC import *
-from types import InstanceType
+try:
+  from types import InstanceType
+except ImportError:
+  InstanceType = object
 import IPC # to get Raise, for some reason from IPC import Raise doesn't work
 
 PrimitiveFMT  = 0
@@ -154,7 +157,7 @@ def arrayTransferToDataStructure (array, buffer, dim, max, len, isSimple,
     elif (isSimple) :
       primProc.DecodeElement(array, i, buffer)
     elif (formatType(arrayFormat) == EnumFMT) :
-	primFmttrs.DecodeElement(primFmttrs.ENUM_FMT, array, i, buffer);
+      primFmttrs.DecodeElement(primFmttrs.ENUM_FMT, array, i, buffer);
     else :
       array[i] = validateObject(array[i], dataStruct, dStart, oclass)
       transferToDataStructure(arrayFormat, array[i], 0, buffer, 0, True)

@@ -123,11 +123,13 @@ CFLAGS			+= -fno-strict-aliasing
 
 CFLAGS			+= -O2
 
+CFLAGS			+= -fPIC # SWIG needs this
+
 ifndef PYTHON_INC_DIR
-PYTHON_INC_DIR		= /usr/include/python2.5
+PYTHON_INC_DIR		= /usr/include/python3.6
 endif
 ifndef PYTHON_LIB_DIR
-PYTHON_LIB_DIR		= /usr/lib/python2.5
+PYTHON_LIB_DIR		= /usr/lib/python3.6
 endif
 INC_PATH		+= -I$(PYTHON_INC_DIR)
 
@@ -211,7 +213,7 @@ IPC_wrap.c : IPC.i ../src/ipcFFI.h ../src/ipcFFI.c \
 ifeq ($(THIS_OS),wnt)
 $(LDIR)/$(PYTHONLIB): $(OBJS)
 	$(RM) $@
-	$(LD_SHARED) -o $@ $(OBJS) -L$(PYTHON_LIB_DIR)/config -lpython2.5 \
+	$(LD_SHARED) -o $@ $(OBJS) -L$(PYTHON_LIB_DIR)/config -lpython3.6 \
 	  $(LIB_PATH) -lipc
 else
 ifeq ($(THIS_OS),Darwin)
@@ -226,6 +228,7 @@ $(LDIR)/$(PYTHONLIB): $(OBJS)
 	cd ../src; $(MAKE) MAKE_SHARED_LIBS=1 install; cd ../python
 	$(LD_SHARED) -o $@ $(OBJS) \
 	  $(PWD)/$(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR)
+	echo $(PWD)/../lib
 endif
 endif
 
