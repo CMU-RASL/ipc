@@ -14,8 +14,8 @@
  * Resources
  *
  * $Source: /afs/cs.cmu.edu/project/TCA/Master/ipc/src/res.c,v $ 
- * $Revision: 2.7 $
- * $Date: 2013/11/22 16:57:30 $
+ * $Revision: 2.6 $
+ * $Date: 2009/01/12 15:54:57 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -25,17 +25,6 @@
  * REVISION HISTORY:
  *
  * $Log: res.c,v $
- * Revision 2.7  2013/11/22 16:57:30  reids
- * Checking whether message is registered no longer caches indication that
- *   one is interested in publishing that message.
- * Direct messaging now respects the capacity constraints of a module.
- * Added capability to send and receive messages in "raw" (byte array) mode.
- * Made global_vars receive and send "raw" data.
- * Check pending limit constraints when they are first declared.
- * Eliminated some extraneous memory allocations.
- * Fixed bug in direct mode where messages that did not have a handler were
- *   being sent to central, anyways.
- *
  * Revision 2.6  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -921,7 +910,7 @@ static void deletePendingDispatch(DISPATCH_PTR dispatch)
 {
   int32 ignored;
   
-  ignored = x_ipc_LogIgnoreP() && Ignore_Logging_Message(dispatch->msg);
+  ignored = Ignore_Logging_Message(dispatch->msg);
   if (ignored) Start_Ignore_Logging();
   
   LOG_STATUS("PENDING LIMIT: ");
@@ -1257,31 +1246,6 @@ static void addHndToResourceHnd(DISPATCH_PTR dispatch,
  *
  *****************************************************************************/
 
-static void limitPendingResource (RESOURCE_PTR resource)
-{
-  if (resource->pendingList->length > resource->pendingLimit) {
-    /*LOG_STATUS3("limitPendingResource: %s %d => %d\n", resource->name,
-		resource->pendingList->length, resource->pendingLimit);*/
-    do {
-      deletePendingDispatch((DISPATCH_PTR)x_ipc_listFirst(resource->pendingList));
-    } while (resource->pendingList->length > resource->pendingLimit);
-  }
-}
-
-static void limitPendingMsgs (RESOURCE_PTR resource, LIMIT_PENDING_PTR limit)
-{
-  DISPATCH_PTR oldest=NULL;
-  int nPending = numPending(limit->msgName, resource->pendingList, &oldest);
-  if (nPending > limit->limit) {
-    /*LOG_STATUS3("limitPendingMsgs: %s %d => %d\n",
-                  limit->msgName, nPending, limit->limit);*/
-    do {
-      deletePendingDispatch(oldest);
-      nPending = numPending(limit->msgName, resource->pendingList, &oldest);
-    } while (nPending > limit->limit);
-  }
-}
-
 static void limitPendingHnd(DISPATCH_PTR dispatch,
 			    LIMIT_PENDING_PTR limitPendingData)
 {
@@ -1314,37 +1278,26 @@ static void limitPendingHnd(DISPATCH_PTR dispatch,
       /* Limit applies to the whole resource */
       if (resource->pendingLimit != NO_PENDING_LIMIT &&
 	  resource->pendingLimit != limitPendingData->limit) {
-	LOG_STATUS3("WARNING: Changing pending resource limit of %s from %d to %d\n",
+	LOG_STATUS3("WARNING: Changing pending resource limit of %s from %d to %d",
 		   limitPendingData->resName, resource->pendingLimit,
 		   limitPendingData->limit);
       }
       resource->pendingLimit = limitPendingData->limit;
-      limitPendingResource(resource);
     } else {
       if (!resource->msgLimitList) resource->msgLimitList = x_ipc_listCreate();
-      MSG_PTR msg = GET_MESSAGE(limitPendingData->msgName);
-      int32 ignored = msg != NULL && x_ipc_LogIgnoreP() && Ignore_Logging_Message(msg);
-      if (ignored) Start_Ignore_Logging();
       msgLimit = 
 	(LIMIT_PENDING_PTR)x_ipc_listMemReturnItem((LIST_ITER_FN)limitEqFunc,
-						   limitPendingData->msgName,
-						   resource->msgLimitList);
+					     limitPendingData->msgName,
+					     resource->msgLimitList);
       if (!msgLimit) {
-	LOG_STATUS3("WARNING: Changing pending message limit of %s to %d for %s\n",
-		    limitPendingData->msgName, limitPendingData->limit,
-		    limitPendingData->resName);
 	x_ipc_listInsertItem(limitPendingData, resource->msgLimitList);
-	msgLimit = limitPendingData;
 	freeData = FALSE;
       } else if (msgLimit->limit != limitPendingData->limit) {
 	LOG_STATUS3("WARNING: Changing pending message limit of %s from %d to %d",
-		    msgLimit->msgName, msgLimit->limit,
-		    limitPendingData->limit);
+		   msgLimit->msgName, msgLimit->limit,
+		   limitPendingData->limit);
 	msgLimit->limit = limitPendingData->limit;
-	LOG_STATUS1(" for %s\n", limitPendingData->resName);
       }
-      limitPendingMsgs(resource, msgLimit);
-      if (ignored) End_Ignore_Logging();
     }
   }
   if (freeData) {

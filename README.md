@@ -2,7 +2,7 @@
 Copyright (c) 2020, Carnegie Mellon University  
 This software is distributed under the terms of the Simplified BSD License (see [LICENSE.TXT](LICENSE.TXT))
 
-Current Version: **3.10.2**
+Current Version: **3.9.1**
 
 This repository is a mirror of the source code released at [http://www.cs.cmu.edu/~ipc/](http://www.cs.cmu.edu/~ipc/).
 
@@ -27,6 +27,7 @@ An overview of the package and API documentation can be found in [IPC_Manual.pdf
 
 ## Notes on Compatibility
 - **[2020-05-22]** We were able to build the central server and C library on Ubuntu 18.04. The python binding is broken and we did not test the other programming bindings.   
+- **[2022-02-25]** Reverted back from 3.10.2 due to bug that needs to be tracked down (probably related to transferring raw data).
 
 
 ## Original README

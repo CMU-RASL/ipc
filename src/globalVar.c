@@ -20,17 +20,6 @@
  * REVISION HISTORY
  *
  * $Log: globalVar.c,v $
- * Revision 2.6  2013/11/22 16:57:30  reids
- * Checking whether message is registered no longer caches indication that
- *   one is interested in publishing that message.
- * Direct messaging now respects the capacity constraints of a module.
- * Added capability to send and receive messages in "raw" (byte array) mode.
- * Made global_vars receive and send "raw" data.
- * Check pending limit constraints when they are first declared.
- * Eliminated some extraneous memory allocations.
- * Fixed bug in direct mode where messages that did not have a handler were
- *   being sent to central, anyways.
- *
  * Revision 2.5  2009/01/12 15:54:56  reids
  * Added BSD Open Source license info
  *
@@ -165,8 +154,8 @@
  * alignment figured out automatically.
  *
  *
- * $Revision: 2.6 $
- * $Date: 2013/11/22 16:57:30 $
+ * $Revision: 2.5 $
+ * $Date: 2009/01/12 15:54:56 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -180,27 +169,11 @@ typedef struct _var {
   const char *varName;
   const char *format;
   void *value;
-  int32 len;
 } GLOBAL_VAR_TYPE, *GLOBAL_VAR_PTR;
 
 typedef const GLOBAL_VAR_TYPE *CONST_GLOBAL_VAR_PTR;
 
 
-static char *concatNames (const char *name1, const char *name2)
-{
-  static int nameLen = 0;
-  static char *concatName = NULL;
-  int neededLen = 1+strlen(name1)+strlen(name2);
-  if (nameLen < neededLen) {
-    nameLen = neededLen;
-    if (concatName) x_ipcFree(concatName);
-    concatName = x_ipcMalloc(nameLen);
-  }
-  strcpy(concatName, name1);
-  strcat(concatName, name2);
-  return concatName;
-}
-
 /*****************************************************************************
  *
  * FUNCTION: static void setVarHnd(DISPATCH_PTR dispatch, void *varValue)
@@ -219,7 +192,6 @@ static void setVarHnd(DISPATCH_PTR dispatch, void *varValue)
   const char *msgName = dispatch->msg->msgData->name;
   const char *varName;
   char *watchMsgName;
-  int len = DISPATCH_MSG_DATA(dispatch)->msgTotal;
   
   varName = &(msgName[strlen(VAR_SET_PREFIX)]);
   
@@ -229,17 +201,20 @@ static void setVarHnd(DISPATCH_PTR dispatch, void *varValue)
   } else {
     /* Free the old data if it exists */
     if (var->value != NULL)
-      x_ipcFree(var->value);
-    /* Store the byte array (marshalled value of the variable) */
-    var->len = len;
+      x_ipcFreeData(msgName,var->value);
+    /* Store the pointer to the new data */
     var->value = varValue;
   }
   /* Need to do a x_ipcSuccess, if a command. */
   /*  centralSuccess(dispatch);*/
   /* Broadcast the result. */
   
-  watchMsgName = concatNames(VAR_WATCH_PREFIX, varName);
-  centralBroadcastRaw(watchMsgName, var->value, var->len);
+  watchMsgName = (char *)x_ipcMalloc(1+strlen(varName)+strlen(VAR_WATCH_PREFIX));
+  strcpy(watchMsgName,VAR_WATCH_PREFIX);
+  strcat(watchMsgName,varName);
+
+  centralBroadcast(watchMsgName,var->value);
+  x_ipcFree(watchMsgName);
 }
 
 
@@ -271,7 +246,7 @@ static void getVarHnd(DISPATCH_PTR dispatch, void *empty)
   if (var == NULL) {
     /* handle the error here. */
   } else {
-    centralReplyRaw(dispatch, (char *)var->value, var->len);
+    centralReply(dispatch, (char *)var->value);
   }
 }
 
@@ -302,13 +277,11 @@ static void getSetVarHnd(DISPATCH_PTR dispatch, void *varValue)
   } else {
     /* Free the old data if it exists */
     if (var->value != NULL) {
-      centralReplyRaw(dispatch, (char *)var->value, var->len);
-      x_ipcFree(var->value);
+      centralReply(dispatch, (char *)var->value);
+      x_ipcFreeData(msgName,var->value);
     }
-    /* Store a copy of the byte array (marshalled value of the variable) */
-    var->len = DISPATCH_MSG_DATA(dispatch)->msgTotal;
-    var->value = (char *)x_ipcMalloc(var->len);
-    BCOPY(varValue, var->value, var->len);
+    /* Store the pointer to the new data */
+    var->value = varValue;
   }
 }
 
@@ -342,44 +315,61 @@ static void registerVarHnd(DISPATCH_PTR dispatch, VAR_REG_PTR varRegData)
   var->varName = varRegData->varName;
   var->format = varRegData->format;
   var->value = NULL;
-  var->len = 0;
   
   /* Create the name strings for the set and get messages.*/
   
-  setMsgName = concatNames(VAR_SET_PREFIX, var->varName);
-
+  setMsgName = (char *)x_ipcMalloc(1+strlen(var->varName)+
+				   strlen(VAR_SET_PREFIX));
+  strcpy(setMsgName,VAR_SET_PREFIX);
+  strcat(setMsgName,var->varName);
+  
+  getMsgName = (char *)x_ipcMalloc(1+strlen(var->varName)+
+				   strlen(VAR_GET_PREFIX));
+  strcpy(getMsgName,VAR_GET_PREFIX);
+  strcat(getMsgName,var->varName);
+  
+  getSetMsgName = (char *)x_ipcMalloc(1+strlen(var->varName)+
+				      strlen(VAR_GET_SET_PREFIX));
+  strcpy(getSetMsgName,VAR_GET_SET_PREFIX);
+  strcat(getSetMsgName,var->varName);
+  
+  watchMsgName = (char *)x_ipcMalloc(1+strlen(var->varName)+
+				     strlen(VAR_WATCH_PREFIX));
+  strcpy(watchMsgName,VAR_WATCH_PREFIX);
+  strcat(watchMsgName,var->varName);
+  
   /* Free up the old var, if any */
   old_var = (CONST_GLOBAL_VAR_PTR)x_ipc_hashTableInsert((void *)var->varName,
-							1+strlen(var->varName),
-							(void *)var,
-							GET_S_GLOBAL(varTable));
+						  1+strlen(var->varName),
+						  (void *)var,
+						  GET_S_GLOBAL(varTable));
   if (old_var != NULL) {
     /* The mesage is already registered, just check the format.   */
-    if (strcmp(old_var->format, var->format)) {
+    if (strcmp(old_var->format,var->format)) {
       X_IPC_ERROR1("ERROR: centralRegisterVar: variable %s already registered"
 		   " with a differnt format.\n", var->varName);
     }
     /* Free the old var */
-    if (old_var->value) x_ipcFree(old_var->value);
+    if (old_var->value) x_ipcFreeData(setMsgName, old_var->value);
     if (old_var->format) x_ipcFree((void *)old_var->format);
     x_ipcFree((void *)old_var->varName);
     x_ipcFree((void *)old_var);
-  } else {
-  /* Register the functions to set and get the variable value.  */
-    centralRegisterInformMessage(setMsgName, var->format);
-    centralRegisterHandlerRaw(setMsgName, setVarHnd);
-
-    getMsgName = concatNames(VAR_GET_PREFIX, var->varName);
-    centralRegisterQueryMessage(getMsgName, NULL, var->format);
-    centralRegisterHandlerRaw(getMsgName, getVarHnd);
-  
-    getSetMsgName = concatNames(VAR_GET_SET_PREFIX, var->varName);
-    centralRegisterQueryMessage(getSetMsgName, var->format, var->format);
-    centralRegisterHandlerRaw(getSetMsgName, getSetVarHnd);
-  
-    watchMsgName = concatNames(VAR_WATCH_PREFIX, var->varName);
-    centralRegisterBroadcastMessage(watchMsgName, var->format);
   }
+
+  /* Register the functions to set and get the variable value.  */
+  
+  centralRegisterInform(setMsgName, var->format, setVarHnd);
+  
+  centralRegisterQuery(getMsgName, NULL, var->format, getVarHnd);
+  
+  centralRegisterQuery(getSetMsgName, var->format, var->format, getSetVarHnd);
+
+  centralRegisterBroadcastMessage(watchMsgName, var->format);
+
+  x_ipcFree(setMsgName);
+  x_ipcFree(getMsgName);
+  x_ipcFree(getSetMsgName);
+  x_ipcFree(watchMsgName);
   /* Just free top level structure -- The strings need to be saved */
   x_ipcFree((char *) varRegData);
 }
@@ -424,8 +414,12 @@ void centralSetVar(const char *varName, const char *value)
   if (!mGlobalp())
     return;
   
-  setMsgName = concatNames(VAR_SET_PREFIX, varName);
+  setMsgName = (char *)x_ipcMalloc(1+strlen(varName)+strlen(VAR_SET_PREFIX));
+  strcpy(setMsgName,VAR_SET_PREFIX);
+  strcat(setMsgName,varName);
+  
   centralInform(setMsgName, value);
+  x_ipcFree(setMsgName);
 }
 
 
@@ -447,17 +441,30 @@ void centralIgnoreVarLogging(const char *varName)
   char *getSetMsgName;
   char *watchMsgName;
   
-  setMsgName = concatNames(VAR_SET_PREFIX, varName);
+  setMsgName = (char *)x_ipcMalloc(1+strlen(varName)+strlen(VAR_SET_PREFIX));
+  strcpy(setMsgName,VAR_SET_PREFIX);
+  strcat(setMsgName,varName);
   Add_Message_To_Ignore(setMsgName);
+  x_ipcFree(setMsgName);
 
-  getMsgName = concatNames(VAR_GET_PREFIX, varName);
+  getMsgName = (char *)x_ipcMalloc(1+strlen(varName)+strlen(VAR_GET_PREFIX));
+  strcpy(getMsgName,VAR_GET_PREFIX);
+  strcat(getMsgName,varName);
   Add_Message_To_Ignore(getMsgName);
+  x_ipcFree(getMsgName);
   
-  getSetMsgName = concatNames(VAR_GET_SET_PREFIX, varName);
+  getSetMsgName = (char *)x_ipcMalloc(1+strlen(varName)+ 
+				    strlen(VAR_GET_SET_PREFIX));
+  strcpy(getSetMsgName,VAR_GET_SET_PREFIX);
+  strcat(getSetMsgName,varName);
   Add_Message_To_Ignore(getSetMsgName);
+  x_ipcFree(getSetMsgName);
   
-  watchMsgName = concatNames(VAR_WATCH_PREFIX, varName);
+  watchMsgName = (char *)x_ipcMalloc(1+strlen(varName)+strlen(VAR_WATCH_PREFIX));
+  strcpy(watchMsgName,VAR_WATCH_PREFIX);
+  strcat(watchMsgName,varName);
   Add_Message_To_Ignore(watchMsgName);
+  x_ipcFree(watchMsgName);
 }
 
 

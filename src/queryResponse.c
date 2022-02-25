@@ -16,9 +16,6 @@
  * REVISION HISTORY
  *
  * $Log: queryResponse.c,v $
- * Revision 2.6  2013/07/23 21:13:39  reids
- * Updated for using SWIG (removing internal Lisp functionality)
- *
  * Revision 2.5  2009/01/12 15:54:57  reids
  * Added BSD Open Source license info
  *
@@ -152,7 +149,7 @@ IPC_RETURN_TYPE IPC_queryNotify (const char *msgName,
     } else {
       return ipcReturnValue(x_ipc_queryNotifySend(msg, msgName, queryData,
 						  (REPLY_HANDLER_FN)handler, 
-						  clientData));
+						  C_LANGUAGE, clientData));
     }
   }
 }
@@ -160,8 +157,7 @@ IPC_RETURN_TYPE IPC_queryNotify (const char *msgName,
 IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName, 
 				    unsigned int length, BYTE_ARRAY content,
 				    BYTE_ARRAY *replyHandle,
-				    FORMATTER_PTR *replyFormatterPtr,
-				    const char **responseMsgNamePtr,
+				    FORMATTER_PTR *replyFormatter,
 				    unsigned int timeoutMsecs)
 {
   unsigned long quitTime = WAITFOREVER, now;
@@ -172,7 +168,6 @@ IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName,
   queryReplyData.handled = FALSE;
   queryReplyData.data = NULL;
   queryReplyData.formatter = (FORMATTER_PTR)NULL;
-  queryReplyData.msgName = NULL;
 
   if (timeoutMsecs != IPC_WAIT_FOREVER) {
     /* When to timeout */
@@ -220,9 +215,21 @@ IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName,
       x_ipcFree((void *)queryNotif);
     }
 
-    *replyHandle = queryReplyData.data;
-    if (replyFormatterPtr) *replyFormatterPtr = queryReplyData.formatter;
-    if (responseMsgNamePtr) *responseMsgNamePtr = queryReplyData.msgName;
+#ifdef LISP
+  LOCK_M_MUTEX;
+  if (replyHandle == (void **)LISP_DATA_FLAG()) {
+    (*GET_M_GLOBAL(lispQueryResponseGlobal))((char *)queryReplyData.data,
+					     queryReplyData.formatter);
+    UNLOCK_M_MUTEX;
+  } else
+#endif /* LISP */
+    {
+#ifdef LISP
+      UNLOCK_M_MUTEX;
+#endif /* LISP */
+      *replyHandle = queryReplyData.data;
+      if (replyFormatter) *replyFormatter = queryReplyData.formatter;
+    }
 
     return retVal;
   }
@@ -234,7 +241,7 @@ IPC_RETURN_TYPE IPC_queryResponse (const char *msgName,
 				   unsigned int timeoutMsecs)
 {
   return _IPC_queryResponse(msgName, length, content, 
-			    replyHandle, NULL, NULL, timeoutMsecs);
+			    replyHandle, NULL, timeoutMsecs);
 }
 
 IPC_RETURN_TYPE IPC_respondVC (MSG_INSTANCE msgInstance, const char *msgName,
@@ -270,7 +277,7 @@ IPC_RETURN_TYPE IPC_queryResponseVC (const char *msgName,
     RETURN_ERROR(IPC_Null_Argument);
   } else {
     return _IPC_queryResponse(msgName, varcontent->length, varcontent->content,
-			      replyHandle, NULL, NULL, timeoutMsecs);
+			      replyHandle, NULL, timeoutMsecs);
   }
 }
 
@@ -289,7 +296,6 @@ static void queryReplyHandler (MSG_INSTANCE msgRef, BYTE_ARRAY callData,
   queryReplyData->handled = TRUE;
   queryReplyData->data = callData;
   queryReplyData->formatter = IPC_msgInstanceFormatter(msgRef);
-  queryReplyData->msgName = IPC_msgInstanceName(msgRef);
 }
 
 static BOOLEAN testQueryReplyData (QUERY_REPLY_PTR queryReply,

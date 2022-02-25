@@ -20,20 +20,6 @@
  * REVISION HISTORY 
  *
  * $Log: comModule.c,v $
- * Revision 2.25  2013/11/22 16:57:29  reids
- * Checking whether message is registered no longer caches indication that
- *   one is interested in publishing that message.
- * Direct messaging now respects the capacity constraints of a module.
- * Added capability to send and receive messages in "raw" (byte array) mode.
- * Made global_vars receive and send "raw" data.
- * Check pending limit constraints when they are first declared.
- * Eliminated some extraneous memory allocations.
- * Fixed bug in direct mode where messages that did not have a handler were
- *   being sent to central, anyways.
- *
- * Revision 2.24  2013/07/23 21:13:39  reids
- * Updated for using SWIG (removing internal Lisp functionality)
- *
  * Revision 2.23  2011/08/16 16:01:52  reids
  * Adding Python interface to IPC, plus some minor bug fixes
  *
@@ -714,8 +700,8 @@
  * common communications between the two - actually i want to avoid 
  * differences - module and server should be alike as much as possible.
  *
- * $Revision: 2.25 $
- * $Date: 2013/11/22 16:57:29 $
+ * $Revision: 2.23 $
+ * $Date: 2011/08/16 16:01:52 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -1202,15 +1188,23 @@ void x_ipcHandleClosedConnection(int sd, CONNECTION_PTR connection)
       x_ipc_globalMInvalidate();
       x_ipcFree((char *)connection);
     }
-    if ((GET_M_GLOBAL(x_ipcExitHnd))) {
-      (*(GET_M_GLOBAL(x_ipcExitHnd)))();
-    } else {
+#ifdef LISP
+    if (IS_LISP_MODULE()) {
+      if (GET_M_GLOBAL(lispExitGlobal) != NULL)
+	(*(GET_M_GLOBAL(lispExitGlobal)))();
+    } else
+#endif /* LISP */
+      {
+	if ((GET_M_GLOBAL(x_ipcExitHnd))) {
+	  (*(GET_M_GLOBAL(x_ipcExitHnd)))();
+	} else {
 #ifdef _WINSOCK_
-      WSACleanup();
+	  WSACleanup();
 #endif /* Unload Winsock DLL */
-      UNLOCK_CM_MUTEX;
-      exit(-1);
-    }
+	  UNLOCK_CM_MUTEX;
+	  exit(-1);
+	}
+      }
   } else {
     X_IPC_MOD_WARNING1("Closed Connection Detected from: Module: sd: %d:\n",
 		       connection->readSd);
@@ -1861,7 +1855,8 @@ static BOOLEAN x_ipc_handleQueryNotification (DATA_MSG_PTR dataMsg)
     decodeFormat = queryNotif->ref->msg->msgData->resFormat;
 #endif
     reply = (!dataMsg->msgTotal ? NO_CLIENT_DATA /* Represents NullReply */
-	     : x_ipc_dataMsgDecodeMsg(decodeFormat, dataMsg, FALSE));
+	     : x_ipc_decodeDataInLanguage(dataMsg, decodeFormat, 
+				    queryNotif->language));
 #ifdef NMP_IPC
     queryNotif->ref->responded = TRUE; /* Prevent it from responding */
     reply = ipcData(queryNotif->ref->msg->msgData->msgFormat, (char *)reply);
@@ -2122,6 +2117,57 @@ X_IPC_RETURN_VALUE_TYPE x_ipcHandleFdInput(int fd)
 
 /******************************************************************************
  *
+ * FUNCTION: void *x_ipc_decodeDataInLanguage (dataMsg, decodeFormat, language)
+ *
+ * DESCRIPTION: Decode dataMsg using format information, creating (and
+ *              returning) a new data structure.
+ *
+ * INPUTS:
+ * DATA_MSG_PTR dataMsg;
+ * CONST_FORMAT_PTR decodeFormat;
+ * HND_LANGUAGE_ENUM language (C, LISP, RAW)
+ *
+ * OUTPUTS: void * (the newly created, decoded data)
+ *
+ *****************************************************************************/
+
+void *x_ipc_decodeDataInLanguage (DATA_MSG_PTR dataMsg, CONST_FORMAT_PTR decodeFormat,
+			    HND_LANGUAGE_ENUM language)
+{
+  void *data;
+
+  switch (language) {
+  case C_LANGUAGE:
+    data = x_ipc_dataMsgDecodeMsg(decodeFormat, dataMsg, FALSE); break;
+
+#ifdef LISP
+  case LISP_LANGUAGE: 
+    { BUFFER_TYPE buffer;
+      long (*lispDecodeMsgFn)(CONST_FORMAT_PTR, BUFFER_PTR);
+      buffer.bstart = 0;
+      buffer.buffer = NULL;
+      
+      LOCK_M_MUTEX;
+      lispDecodeMsgFn = GET_M_GLOBAL(lispDecodeMsgGlobal);
+      UNLOCK_M_MUTEX;
+      if (decodeFormat && dataMsg->msgTotal) {
+	buffer.buffer = dataMsg->msgData;
+	data = (void *)(*lispDecodeMsgFn)(decodeFormat, &buffer);
+      } else {
+	data = (void *)(*lispDecodeMsgFn)(0, NULL);
+      }
+      break;
+    }
+#endif /* LISP */
+  default: 
+    data = NULL;
+    X_IPC_MOD_ERROR1("Decode in unknown language (%d)\n", language);
+  }
+  return data;
+}
+
+/******************************************************************************
+ *
  * FUNCTION: X_IPC_RETURN_VALUE_TYPE x_ipc_processQueryReply(dataMsg, msg, sel, reply)
  *
  * DESCRIPTION: 
@@ -2145,6 +2191,9 @@ static X_IPC_RETURN_VALUE_TYPE x_ipc_processQueryReply(DATA_MSG_PTR dataMsg,
   char *r2= NULL;
   CONST_FORMAT_PTR decodeFormat;
   int amount;
+#ifdef LISP
+  char *lispDataFlag;
+#endif  
 
   if (dataMsg->msgTotal == 0) {
     x_ipc_dataMsgFree(dataMsg);
@@ -2152,14 +2201,24 @@ static X_IPC_RETURN_VALUE_TYPE x_ipc_processQueryReply(DATA_MSG_PTR dataMsg,
   }
   
   decodeFormat = (sel ? msg->msgData->msgFormat : msg->msgData->resFormat);
+#ifdef LISP
+  LOCK_M_MUTEX;
+  lispDataFlag = LISP_DATA_FLAG();
+  UNLOCK_M_MUTEX;
+  if (reply == lispDataFlag) {
+    /* The LISP decode function sets the data to a LISP global variable */
+    (void)x_ipc_decodeDataInLanguage(dataMsg, decodeFormat, LISP_LANGUAGE);
+  } else
+#endif /* LISP */
+    {
+    r2 = (char *)x_ipc_decodeDataInLanguage(dataMsg, decodeFormat, C_LANGUAGE);
+    amount = x_ipc_dataStructureSize(decodeFormat);
 
-  r2 = (char *)x_ipc_dataMsgDecodeMsg(decodeFormat, dataMsg, FALSE);
-  amount = x_ipc_dataStructureSize(decodeFormat);
-
-  /* Free only if it was allocated. */
-  if (r2 != reply) {
-    BCOPY(r2, reply, amount);
-    x_ipcFree((char *)r2);
+    /* Free only if it was allocated. */
+    if (r2 != reply) {
+      BCOPY(r2, reply, amount);
+      x_ipcFree((char *)r2);
+    }
   }
   
   x_ipc_dataMsgFree(dataMsg);
@@ -2460,8 +2519,7 @@ X_IPC_RETURN_VALUE_TYPE x_ipc_waitForReplyFromTime(X_IPC_REF_PTR ref,
       if (CONNECTED_TO_CENTRAL) {
 	/* Pick the first message off the queue */
 	LOCK_CM_MUTEX;
-	BOOLEAN atCapacity = GET_M_GLOBAL(attending) >= GET_M_GLOBAL(capacity);
-	queuedMsg = (atCapacity ? NULL : dequeueMsg(&GET_C_GLOBAL(msgQueue)));
+	queuedMsg = dequeueMsg(&GET_C_GLOBAL(msgQueue));
 	UNLOCK_CM_MUTEX;
 	if (queuedMsg) {
 	  x_ipc_execHnd(queuedMsg->connection, queuedMsg->dataMsg);
@@ -2653,7 +2711,7 @@ void x_ipcDirectResource(const char *name)
     
     GET_C_GLOBAL(listenPortNum) = port;
   }
-
+  
   direct.port = GET_C_GLOBAL(listenPortNum);
   direct.name = name;
   UNLOCK_CM_MUTEX;

@@ -66,9 +66,6 @@
  * REVISION HISTORY:
  *
  * $Log: primFmttrs.c,v $
- * Revision 2.7  2013/07/23 21:13:39  reids
- * Updated for using SWIG (removing internal Lisp functionality)
- *
  * Revision 2.6  2009/05/04 19:02:53  reids
  * Fixed bug in dealing with longs and doubles for 64 bit machines
  *
@@ -298,8 +295,8 @@
  * Revision 1.2  1993/05/19  17:24:57  fedor
  * Added Logging.
  *
- * $Revision: 2.7 $
- * $Date: 2013/07/23 21:13:39 $
+ * $Revision: 2.6 $
+ * $Date: 2009/05/04 19:02:53 $
  * $Author: reids $
  *
  *
@@ -715,6 +712,10 @@ static int32 x_ipc_FORMAT_Trans_Decode1(FORMAT_PTR format, char *buffer,
 				       &format_array[i].f->formatter.name,
 				       0, buffer, current_byte,
 				       byteOrder, alignment);
+      LOCK_M_MUTEX;
+      if (IS_LISP_MODULE())
+	upcase(format_array[i].f->formatter.name);
+      UNLOCK_M_MUTEX;
     }
     break;
 
@@ -1148,7 +1149,7 @@ static int32 x_ipc_Basic_Trans_DPrint(CONST_GENERIC_DATA_PTR datastruct,
 				      int32 next, PRINT_FN printFn)
 { 
   (printFn)(stream, printer, (datastruct+dstart), next);
-  fflush(stdout);
+  FLUSH_IF_NEEDED(stdout);
   return TRUE;
 }
 

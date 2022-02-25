@@ -20,21 +20,6 @@
  * REVISION HISTORY
  *
  * $Log: modVar.c,v $
- * Revision 2.7  2013/11/22 16:57:30  reids
- * Checking whether message is registered no longer caches indication that
- *   one is interested in publishing that message.
- * Direct messaging now respects the capacity constraints of a module.
- * Added capability to send and receive messages in "raw" (byte array) mode.
- * Made global_vars receive and send "raw" data.
- * Check pending limit constraints when they are first declared.
- * Eliminated some extraneous memory allocations.
- * Fixed bug in direct mode where messages that did not have a handler were
- *   being sent to central, anyways.
- *
- * Revision 2.6  2013/09/22 21:20:41  reids
- * Fixed bugs related to race conditions in setting global variables, and
- * calling "waitUntilReady" multiple times.
- *
  * Revision 2.5  2011/04/21 18:17:49  reids
  * IPC 3.9.0:
  * Added NoListen options to IPC_connect, to indicate that module will not
@@ -201,8 +186,8 @@
  * alignment figured out automatically.
  *
  *
- * $Revision: 2.7 $
- * $Date: 2013/11/22 16:57:30 $
+ * $Revision: 2.5 $
+ * $Date: 2011/04/21 18:17:49 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -356,16 +341,11 @@ void _x_ipcWatchVar(const char *varName, const char *format, X_IPC_HND_FN watchF
   strcpy(watchMsgName,VAR_WATCH_PREFIX);
   strcat(watchMsgName,varName);
   
-  /* Check to see if already registered */
-  LOCK_CM_MUTEX; 
-  HND_KEY_TYPE hndKey; hndKey.num = 0; hndKey.str = watchMsgName;
-  HND_PTR watchMsgHnd = GET_HANDLER(&hndKey);
-  UNLOCK_CM_MUTEX;
-  if (watchMsgHnd == NULL || watchMsgHnd->msg == NULL) {
-    /* Register the tap messages and handler */
-    x_ipcRegisterHandler(watchMsgName,watchMsgName,watchFn);
-    x_ipcLimitPendingMessages(watchMsgName, GET_M_GLOBAL(modNameGlobal), 1);
-  }
+  /* Make sure the variable is registered first. */
+  /*  x_ipcRegisterVar(varName, format);*/
+  
+  /* Register the tap messages and handler */
+  x_ipcRegisterHandler(watchMsgName,watchMsgName,watchFn);
   x_ipcFree(watchMsgName);
 }
 
@@ -513,77 +493,46 @@ static void x_ipc_broadcastMsgVarHnd(X_IPC_REF_PTR Ref, STR_LIST_PTR broadcast)
  *
  *****************************************************************************/
 
-static LOG_PTR x_ipcGetLogVar (const char *msgName)
-{
-  LOG_PTR logVar = (LOG_PTR) x_ipcMalloc(sizeof(LOG_TYPE));
-  x_ipcGetVar(msgName, (void *)logVar);
-  return logVar;
-}
-
-static STR_LIST_PTR x_ipcGetStrListVar (const char *msgName)
-{
-  STR_LIST_PTR strListVar = x_ipc_strListCreate();
-  x_ipcGetVar(msgName, (void *)strListVar);
-  return strListVar;
-}
-
 void x_ipc_modVarInitialize(void)
 {
-  /* Major possibility of race conditions: Need to get the list first,
-     and then set global var -- RGS, 9/21/2013 */
+
+  LOCK_CM_MUTEX;
+  GET_M_GLOBAL(logList)[0] = (LOG_PTR) x_ipcMalloc(sizeof(LOG_TYPE));
+  GET_M_GLOBAL(logList)[1] = (LOG_PTR) x_ipcMalloc(sizeof(LOG_TYPE));
+  GET_M_GLOBAL(logList)[2] = NULL;
 
   /* Register Handlers for the logging status. */
-  LOG_PTR logVar0 = x_ipcGetLogVar(X_IPC_TERMINAL_LOG_VAR);
-  LOG_PTR logVar1 = x_ipcGetLogVar(X_IPC_FILE_LOG_VAR);
-  LOCK_CM_MUTEX;
-  if (GET_M_GLOBAL(logList)[0] != NULL)
-    x_ipcFree((void *)GET_M_GLOBAL(logList)[0]);
-  GET_M_GLOBAL(logList)[0] = logVar0;
-  if (GET_M_GLOBAL(logList)[1] != NULL)
-    x_ipcFree((void *)GET_M_GLOBAL(logList)[1]);
-  GET_M_GLOBAL(logList)[1] = logVar1;
-  GET_M_GLOBAL(logList)[2] = NULL;
-  UNLOCK_CM_MUTEX;
-
+  x_ipcGetVar(X_IPC_TERMINAL_LOG_VAR, (GET_M_GLOBAL(logList)[0]));
+  x_ipcGetVar(X_IPC_FILE_LOG_VAR, (GET_M_GLOBAL(logList)[1]));
   /* Register Handlers for tapped messages. */
-  STR_LIST_PTR tappedMsgs = x_ipcGetStrListVar(X_IPC_TAPPED_MSG_VAR);
+  GET_C_GLOBAL(tappedMsgs) = x_ipc_strListCreate();
+  x_ipcGetVar(X_IPC_TAPPED_MSG_VAR, GET_C_GLOBAL(tappedMsgs));
   /* Register Handlers for broadcast messages. */
-  STR_LIST_PTR broadcastMsgs = x_ipcGetStrListVar(X_IPC_BROADCAST_MSG_VAR);
-  LOCK_CM_MUTEX;
-  if (GET_C_GLOBAL(tappedMsgs) != NULL)
-    x_ipc_strListFree(&GET_C_GLOBAL(tappedMsgs),TRUE);
-  GET_C_GLOBAL(tappedMsgs) = tappedMsgs;
-  if (GET_C_GLOBAL(broadcastMsgs) != NULL)
-    x_ipc_strListFree(&GET_C_GLOBAL(broadcastMsgs),TRUE);
-  GET_C_GLOBAL(broadcastMsgs) = broadcastMsgs;
-  UNLOCK_CM_MUTEX;
+  GET_C_GLOBAL(broadcastMsgs) = x_ipc_strListCreate();
+  x_ipcGetVar(X_IPC_BROADCAST_MSG_VAR, GET_C_GLOBAL(broadcastMsgs));
 
-  LOCK_CM_MUTEX;
   /* Only want to tap if the module is also listening for other messages. */
   if (GET_C_GLOBAL(willListen) && GET_C_GLOBAL(directDefault)) {
-    x_ipcWatchVar(X_IPC_TERMINAL_LOG_VAR,X_IPC_LOG_VAR_FORMAT,
-		  x_ipc_terminalLogVarHnd);
-    x_ipcWatchVar(X_IPC_FILE_LOG_VAR, X_IPC_LOG_VAR_FORMAT,
-		  x_ipc_fileLogVarHnd);
-    x_ipcWatchVar(X_IPC_TAPPED_MSG_VAR,X_IPC_STR_LIST_FORMAT,
-		  x_ipc_tappedMsgVarHnd);
+    x_ipcWatchVar(X_IPC_TERMINAL_LOG_VAR,X_IPC_LOG_VAR_FORMAT, x_ipc_terminalLogVarHnd);
+    x_ipcWatchVar(X_IPC_FILE_LOG_VAR, X_IPC_LOG_VAR_FORMAT, x_ipc_fileLogVarHnd);
+    x_ipcWatchVar(X_IPC_TAPPED_MSG_VAR,X_IPC_STR_LIST_FORMAT, x_ipc_tappedMsgVarHnd);
     x_ipcLimitPendingMessages(X_IPC_TERMINAL_LOG_VAR, 
-			      GET_M_GLOBAL(modNameGlobal), 1);
+			    GET_M_GLOBAL(modNameGlobal), 1);
     x_ipcLimitPendingMessages(X_IPC_FILE_LOG_VAR, 
-			      GET_M_GLOBAL(modNameGlobal), 1);
+			    GET_M_GLOBAL(modNameGlobal), 1);
     x_ipcLimitPendingMessages(X_IPC_TAPPED_MSG_VAR, 
-			      GET_M_GLOBAL(modNameGlobal), 1);
+			    GET_M_GLOBAL(modNameGlobal), 1);
   }
 
   /* Only want to tap if the module is also listening for other messages. */
   if (GET_C_GLOBAL(willListen)) {
-    x_ipcWatchVar(X_IPC_BROADCAST_MSG_VAR,X_IPC_STR_LIST_FORMAT,
-		  x_ipc_broadcastMsgVarHnd);
+    x_ipcWatchVar(X_IPC_BROADCAST_MSG_VAR,X_IPC_STR_LIST_FORMAT, x_ipc_broadcastMsgVarHnd);
     x_ipcLimitPendingMessages(X_IPC_BROADCAST_MSG_VAR, 
-			      GET_M_GLOBAL(modNameGlobal), 1);
+			    GET_M_GLOBAL(modNameGlobal), 1);
   } else {
     x_ipc_strListFree(&GET_C_GLOBAL(broadcastMsgs), TRUE);
     GET_C_GLOBAL(broadcastMsgs) = NULL;
   }
   UNLOCK_CM_MUTEX;
 }
+

@@ -16,9 +16,6 @@
  * REVISION HISTORY
  *
  * $Log: marshall.c,v $
- * Revision 2.8  2013/07/23 21:13:39  reids
- * Updated for using SWIG (removing internal Lisp functionality)
- *
  * Revision 2.7  2009/01/12 15:54:56  reids
  * Added BSD Open Source license info
  *
@@ -380,8 +377,7 @@ IPC_RETURN_TYPE IPC_queryResponseData (const char *msgName,
     PASS_ON_ERROR();
   } else {
     retVal = _IPC_queryResponse(msgName, varcontent.length, varcontent.content,
-				&replyByteArray, &decodeFormat, NULL,
-				timeoutMsecs);
+				&replyByteArray, &decodeFormat, timeoutMsecs);
     if (retVal == IPC_OK) {
       retVal = _IPC_unmarshall(decodeFormat, replyByteArray, replyData, TRUE);
       if (replyByteArray != replyData) x_ipcFree(replyByteArray);
@@ -473,8 +469,36 @@ IPC_RETURN_TYPE IPC_checkMsgFormats (const char *msgName,
     }
   }
 }
-
+
 void IPC_freeByteArray (BYTE_ARRAY byteArray)
 {
   x_ipcFree(byteArray);
 }
+
+#ifdef LISP
+/* Prototypes, to keep compiler happy */
+#ifdef macintosh
+#pragma export on
+#endif
+BYTE_ARRAY IPC_createByteArray (unsigned int length);
+BUFFER_PTR ipcSetEncodeBuffer (BYTE_ARRAY byteArray);
+#ifdef macintosh
+#pragma export off
+#endif
+
+BYTE_ARRAY IPC_createByteArray (unsigned int length)
+{
+  return x_ipcMalloc(length);
+}
+
+/* Need a scheme that does not malloc memory */
+BUFFER_PTR ipcSetEncodeBuffer (BYTE_ARRAY byteArray)
+{
+  BUFFER_PTR buffer = NEW(BUFFER_TYPE);
+
+  buffer->bstart = 0;
+  buffer->buffer = (char *)byteArray;
+
+  return buffer;
+}
+#endif /* LISP */

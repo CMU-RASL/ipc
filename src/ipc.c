@@ -15,9 +15,6 @@
  * REVISION HISTORY
  *
  * $Log: ipc.c,v $
- * Revision 2.20  2013/07/23 21:13:39  reids
- * Updated for using SWIG (removing internal Lisp functionality)
- *
  * Revision 2.19  2011/08/16 16:01:53  reids
  * Adding Python interface to IPC, plus some minor bug fixes
  *
@@ -227,17 +224,28 @@ const char *ipcErrorStrings[NUM_ERRORS] =
 
 IPC_VERBOSITY_TYPE ipcVerbosity = IPC_Exit_On_Errors;
 
-IPC_RETURN_TYPE IPC_initialize (void)
+IPC_RETURN_TYPE _IPC_initialize (BOOLEAN isLispModule)
 {
   x_ipcModuleInitialize();
+#ifdef LISP
+  if (isLispModule) set_Is_Lisp_Module();
+#else
+  if (isLispModule) ; /* No-op to keep compiler happy */
+#endif
   return IPC_OK;
+}
+
+IPC_RETURN_TYPE IPC_initialize (void)
+{
+  return _IPC_initialize(FALSE);
 }
 
 /* TNgo, 5/22/97, added another variable to this function
    so that it can be called by IPC_connectModule */
 IPC_RETURN_TYPE _IPC_connect (const char *taskName,
 			      const char *serverName,
-			      BOOLEAN willListen)
+			      BOOLEAN willListen,
+			      BOOLEAN isLispModule)
 {
   const char *serverHost;
   char *colon = NULL;
@@ -265,7 +273,7 @@ IPC_RETURN_TYPE _IPC_connect (const char *taskName,
     if (i > 0 && ipcVerbosity > IPC_Silent)
       printf("  Trying again %s to connect with the central server on %s\n",
 		      taskName, serverHost);
-    IPC_initialize();
+    _IPC_initialize(isLispModule);
     x_ipcWillListen(willListen);
     x_ipcConnectModule(taskName, serverHost);
     if (X_IPC_CONNECTED()) {
@@ -288,25 +296,25 @@ IPC_RETURN_TYPE _IPC_connect (const char *taskName,
 
 IPC_RETURN_TYPE IPC_connect (const char *taskName)
 {
-  return _IPC_connect(taskName, NULL, TRUE);
+  return _IPC_connect(taskName, NULL, TRUE, FALSE);
 }
 
 /* Added by TNgo, 5/22/97 */
 IPC_RETURN_TYPE IPC_connectModule (const char *taskName,
 				   const char *serverName)
 {
-  return _IPC_connect(taskName, serverName, TRUE);
+  return _IPC_connect(taskName, serverName, TRUE, FALSE);
 }
 
 IPC_RETURN_TYPE IPC_connectNoListen (const char *taskName)
 {
-  return _IPC_connect(taskName, NULL, FALSE);
+  return _IPC_connect(taskName, NULL, FALSE, FALSE);
 }
 
 IPC_RETURN_TYPE IPC_connectModuleNoListen (const char *taskName,
 					   const char *serverName)
 {
-  return _IPC_connect(taskName, serverName, FALSE);
+  return _IPC_connect(taskName, serverName, FALSE, FALSE);
 }
 
 IPC_RETURN_TYPE IPC_disconnect (void)
@@ -458,7 +466,7 @@ IPC_RETURN_TYPE _IPC_subscribe (const char *msgName, const char *hndName,
       X_IPC_MOD_WARNING1("WARNING: Subscribing to %s, "
 			 "but have connected no-listen\n", msgName);
 
-    x_ipcRegisterHandler(msgName, hndName, (X_IPC_HND_FN)handler);
+    x_ipcRegisterHandler(msgName, hndName, handler);
 
     /* Set the client data */
     hndKey.num = 0; hndKey.str = hndName;

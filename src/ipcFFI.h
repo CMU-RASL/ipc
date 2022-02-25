@@ -15,12 +15,6 @@
  * REVISION HISTORY
  *
  * $Log: ipcFFI.h,v $
- * Revision 2.4  2013/07/23 21:13:39  reids
- * Updated for using SWIG (removing internal Lisp functionality)
- *
- * Revision 2.3  2012/02/27 16:55:46  reids
- * Fixed some problems with python and significantly improved transfer of arrays to/from python
- *
  * Revision 2.2  2011/08/17 01:11:38  reids
  * Took out unused and LISP-specific functions
  *
@@ -73,8 +67,6 @@ void formatPutShort(BUFFER_PTR buffer, int32 i);
 int32 formatGetShort(BUFFER_PTR buffer);
 void formatPutInt(BUFFER_PTR buffer, int32 i);
 int32 formatGetInt(BUFFER_PTR buffer);
-void formatPutLong(BUFFER_PTR buffer, long l);
-long formatGetLong(BUFFER_PTR buffer);
 double formatGetFloat(BUFFER_PTR buffer);
 void formatPutFloat(BUFFER_PTR buffer, double f);
 double formatGetDouble(BUFFER_PTR buffer);
@@ -100,17 +92,6 @@ BOOLEAN validFormatter (FORMAT_PTR format);
 unsigned int maxTriggers (TIMER_REF timerRef);
 
 BOOLEAN checkMarshallStatus (FORMATTER_PTR formatter);
-
-/* Needed for Lisp port */
-int msgByteOrder (void);
-int hostByteOrder (void);
-void ipcSetError (IPC_ERROR_TYPE error);
-
-void blockCopyToArray(BUFFER_PTR buffer, void *array, int32 amount);
-void blockCopyFromArray(BUFFER_PTR buffer, void *array, int32 amount);
-
-int32 enumStringIndex (CONST_FORMAT_PTR format, char *enumString);
-char *enumValString (CONST_FORMAT_PTR format, int32 enumVal);
 
 #ifdef NEED_DEBUGGING
 /* The following functions are for debugging purposes, only */

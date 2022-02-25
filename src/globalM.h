@@ -16,20 +16,6 @@
  * REVISION HISTORY
  *
  * $Log: globalM.h,v $
- * Revision 2.10  2013/11/22 16:57:30  reids
- * Checking whether message is registered no longer caches indication that
- *   one is interested in publishing that message.
- * Direct messaging now respects the capacity constraints of a module.
- * Added capability to send and receive messages in "raw" (byte array) mode.
- * Made global_vars receive and send "raw" data.
- * Check pending limit constraints when they are first declared.
- * Eliminated some extraneous memory allocations.
- * Fixed bug in direct mode where messages that did not have a handler were
- *   being sent to central, anyways.
- *
- * Revision 2.9  2013/07/23 21:13:39  reids
- * Updated for using SWIG (removing internal Lisp functionality)
- *
  * Revision 2.8  2010/12/17 19:20:23  reids
  * Split IO mutex into separate read and write mutexes, to help minimize
  *   probability of deadlock when reading/writing very big messages.
@@ -397,8 +383,8 @@
  * Revision 1.2  1993/05/19  17:23:55  fedor
  * Added Logging.
  *
- * $Revision: 2.10 $
- * $Date: 2013/11/22 16:57:30 $
+ * $Revision: 2.8 $
+ * $Date: 2010/12/17 19:20:23 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -514,6 +500,33 @@
 
 /***************************************/
 
+#ifdef LISP
+#define IS_LISP_MODULE() (GET_M_GLOBAL(lispFlagGlobal) != '\0')
+#define LISP_DATA_FLAG() (&GET_M_GLOBAL(lispFlagGlobal))
+
+void set_Is_Lisp_Module(void);
+
+#else /* !LISP */
+#define IS_LISP_MODULE() FALSE /* No-op */
+#endif /* !LISP */
+
+#ifdef LISPWORKS_FFI_HACK
+typedef enum { ExecHnd_Idle=0, ExecHnd_Pending=1,
+	       ExecHnd_Handling=2 } EXECHND_STATE_ENUM;
+
+typedef struct {
+  EXECHND_STATE_ENUM state;
+  X_IPC_REF_PTR x_ipcRef;
+  const char *hndName;
+  void *data;
+  void *clientData;
+  CONNECTION_PTR connection;
+  MSG_PTR msg;
+  int tmpParentRef;
+  int tmpResponse;
+} LISPWORKS_HACK_TYPE, *LISPWORKS_HACK_PTR;
+#endif /* LISPWORKS_FFI_HACK */
+
 typedef struct _X_IPC_CONTEXT {
   fd_set x_ipcConnectionListGlobal;
   fd_set x_ipcListenMaskGlobal;
@@ -550,6 +563,9 @@ typedef struct _X_IPC_CONTEXT {
   MUTEX_TYPE ioMutex;
   MUTEX_TYPE readMutex;
 #endif
+#ifdef LISPWORKS_FFI_HACK
+  LISPWORKS_HACK_TYPE execHndState;
+#endif /* LISPWORKS_FFI_HACK */
 } X_IPC_CONTEXT_TYPE;
 
 typedef struct _GM {
@@ -636,8 +652,6 @@ typedef struct _GM {
 
   LIST_PTR moduleList;
 
-  int32 capacity, attending;
-
 #ifdef NMP_IPC
   /* This used to be declared static, but has to be here to prevent
      conflicts between vxworks tasks */
@@ -648,6 +662,18 @@ typedef struct _GM {
   MUTEX_TYPE selectMutex;
   PING_THREAD_TYPE ping;
 #endif
+#ifdef LISP
+  /* LISP-RELATED STUFF */
+  char lispFlagGlobal;
+  X_IPC_REF_PTR lispRefSaveGlobal;
+  int32 (*lispBufferSizeGlobal)(int32 *, CONST_FORMAT_PTR);
+  long (*lispDecodeMsgGlobal)(CONST_FORMAT_PTR, BUFFER_PTR);
+  long (*lispEncodeMsgGlobal)(CONST_FORMAT_PTR, BUFFER_PTR);
+  int32 (*lispExitGlobal)(void);
+#ifdef NMP_IPC
+  int32 (*lispQueryResponseGlobal)(char *, CONST_FORMAT_PTR);
+#endif
+#endif /* LISP */
 } GM_TYPE, *GM_PTR;
 
 #if defined(VXWORKS)

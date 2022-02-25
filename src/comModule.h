@@ -14,8 +14,8 @@
  * Module Communications
  *
  * $Source: /afs/cs.cmu.edu/project/TCA/Master/ipc/src/comModule.h,v $ 
- * $Revision: 2.8 $
- * $Date: 2013/07/23 21:13:39 $
+ * $Revision: 2.7 $
+ * $Date: 2009/01/12 15:54:55 $
  * $Author: reids $
  *
  * Copyright (c) 2008, Carnegie Mellon University
@@ -25,9 +25,6 @@
  * REVISION HISTORY:
  *
  * $Log: comModule.h,v $
- * Revision 2.8  2013/07/23 21:13:39  reids
- * Updated for using SWIG (removing internal Lisp functionality)
- *
  * Revision 2.7  2009/01/12 15:54:55  reids
  * Added BSD Open Source license info
  *
@@ -236,6 +233,7 @@ typedef struct {
 typedef struct {
   X_IPC_REF_PTR ref;
   REPLY_HANDLER_FN handler;
+  HND_LANGUAGE_ENUM language;
   void *clientData;
 } QUERY_NOTIFICATION_TYPE, *QUERY_NOTIFICATION_PTR;
 
@@ -258,6 +256,9 @@ void enqueueMsg (MSG_QUEUE_PTR msgQueue,
 QUEUED_MSG_PTR dequeueMsg (MSG_QUEUE_PTR msgQueue);
 
 void x_ipcModuleInitialize(void);
+
+void *x_ipc_decodeDataInLanguage (DATA_MSG_PTR dataMsg, CONST_FORMAT_PTR decodeFormat,
+			    HND_LANGUAGE_ENUM language);
 
 X_IPC_RETURN_VALUE_TYPE x_ipc_waitForReplyFrom(X_IPC_REF_PTR ref, void *reply, 
 				       BOOLEAN sel, long timeout, int fd);

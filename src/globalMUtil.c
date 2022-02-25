@@ -16,20 +16,6 @@
  * REVISION HISTORY
  *
  * $Log: globalMUtil.c,v $
- * Revision 2.13  2013/11/22 16:57:30  reids
- * Checking whether message is registered no longer caches indication that
- *   one is interested in publishing that message.
- * Direct messaging now respects the capacity constraints of a module.
- * Added capability to send and receive messages in "raw" (byte array) mode.
- * Made global_vars receive and send "raw" data.
- * Check pending limit constraints when they are first declared.
- * Eliminated some extraneous memory allocations.
- * Fixed bug in direct mode where messages that did not have a handler were
- *   being sent to central, anyways.
- *
- * Revision 2.12  2013/07/23 21:13:39  reids
- * Updated for using SWIG (removing internal Lisp functionality)
- *
  * Revision 2.11  2011/08/16 16:01:52  reids
  * Adding Python interface to IPC, plus some minor bug fixes
  *
@@ -408,8 +394,8 @@
  * Revision 1.2  1993/05/19  17:23:50  fedor
  * Added Logging.
  *
- * $Revision: 2.13 $
- * $Date: 2013/11/22 16:57:30 $
+ * $Revision: 2.11 $
+ * $Date: 2011/08/16 16:01:52 $
  * $Author: reids $
  *
  *****************************************************************************/
@@ -428,6 +414,13 @@
 #ifdef THREADED
 #include "multiThread.h"
 extern MUTEX_TYPE listMutex; /* Defined in list.c */
+#endif
+
+#if defined(CLISP)
+extern int (lispbuffersize) (u_int32 g695, u_int32 g696, void* g697);
+extern int (lispdecode) (u_int32 g667, u_int32 g668);
+extern int (lispencode) (u_int32 g681, void* g682, u_int32 g683);
+extern int (lispexit) (void);
 #endif
 
 void x_ipc_globalMInit(void)
@@ -544,6 +537,25 @@ void x_ipc_globalMInit(void)
   
   FD_ZERO(&(GET_C_GLOBAL(x_ipcConnectionListGlobal)));
   FD_ZERO(&(GET_C_GLOBAL(x_ipcListenMaskGlobal)));
+  
+#ifdef LISP
+  GET_M_GLOBAL(lispFlagGlobal) = '\0';
+  GET_M_GLOBAL(lispRefSaveGlobal) = NULL;
+#ifdef CLISP
+  GET_M_GLOBAL(lispBufferSizeGlobal) = lispbuffersize;
+  GET_M_GLOBAL(lispDecodeMsgGlobal) = lispdecode;
+  GET_M_GLOBAL(lispEncodeMsgGlobal) = lispencode;
+  GET_M_GLOBAL(lispExitGlobal) = lispexit;
+#else /* !CLISP */
+  GET_M_GLOBAL(lispBufferSizeGlobal) = NULL;
+  GET_M_GLOBAL(lispDecodeMsgGlobal) = NULL;
+  GET_M_GLOBAL(lispEncodeMsgGlobal) = NULL;
+  GET_M_GLOBAL(lispExitGlobal) = NULL;
+#endif /* !CLISP */
+#ifdef NMP_IPC
+  GET_M_GLOBAL(lispQueryResponseGlobal) = NULL;
+#endif
+#endif /* LISP */
 
   GET_M_GLOBAL(DMFree) = 0;
   GET_M_GLOBAL(DMTotal) =0;
@@ -605,13 +617,13 @@ void x_ipc_globalMInit(void)
   GET_M_GLOBAL(requiredResources) = x_ipc_strListCreate();
   GET_M_GLOBAL(moduleList) = NULL;
 
-  GET_M_GLOBAL(capacity) = 1; /* Default */
-  GET_M_GLOBAL(attending) = 0;
-
 #ifdef NMP_IPC
   GET_M_GLOBAL(timerList) = x_ipc_listCreate();
 #endif
 
+#ifdef LISPWORKS_FFI_HACK
+  GET_C_GLOBAL(execHndState).state = ExecHnd_Idle;
+#endif
   UNLOCK_CM_MUTEX;
 }
 
@@ -918,3 +930,15 @@ X_IPC_TIME_POINT_TYPE x_ipcDefaultTime(void)
 
   return result;
 }
+
+#ifdef LISP
+/****************************************************************
+ * Indicate that the module is LISP, not C
+ ****************************************************************/
+void set_Is_Lisp_Module(void)
+{
+  LOCK_M_MUTEX;
+  GET_M_GLOBAL(lispFlagGlobal) = 'L';
+  UNLOCK_M_MUTEX;
+}
+#endif /* LISP */
