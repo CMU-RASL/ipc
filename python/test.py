@@ -1,6 +1,5 @@
 from primFmttrs import *
 from formatters import *
-#from _IPC import *
 from IPC import *
 
 IPC_initialize()
@@ -124,7 +123,13 @@ def test2 () :
     vc9 = IPC_VARCONTENT_TYPE()
     fmt9 = IPC_parseFormat("long")
     marshall(fmt9, 0X7FFFFFFF, vc9)
-#    marshall(fmt9, -1, vc9)
+    printByteArray(vc9.content, vc9.length)
+    print(unmarshall(fmt9, vc9.content))
+    print()
+
+    vc10 = IPC_VARCONTENT_TYPE()
+    fmt9 = IPC_parseFormat("long")
+    marshall(fmt9, -1, vc9)
     printByteArray(vc9.content, vc9.length)
     print(unmarshall(fmt9, vc9.content))
 
@@ -181,7 +186,8 @@ def test4 () :
     IPC_initialize()
     fmt1 = IPC_parseFormat("[int :5]")
     vc1 = IPC_VARCONTENT_TYPE()
-    ds1 = range(10,15)
+    ds1 = [*range(10,15)]
+    print(ds1)
     marshall(fmt1, ds1, vc1)
     printByteArray(vc1.content, vc1.length)
     print(unmarshall(fmt1, vc1.content))
@@ -234,7 +240,7 @@ def test5 () :
     vc1 = IPC_VARCONTENT_TYPE()
     ds1 = struct4()
     ds1.num = 5
-    ds1.ar = range(10,15)
+    ds1.ar = [*range(10,15)]
     marshall(fmt1, ds1, vc1)
     printByteArray(vc1.content, vc1.length)
     print(unmarshall(fmt1, vc1.content, struct4()))
@@ -348,6 +354,7 @@ def msgHandler2 (msgInstance, data, clientData) :
 def test9 () :
   IPC_connect("test")
   IPC_defineMsg("f", IPC_VARIABLE_LENGTH, "int")
+  #IPC_msgClass("f", int)
   IPC_subscribeData("f", msgHandler1, 1)
   IPC_publishData("f", 42)
   IPC_listenClear(1000)
@@ -501,6 +508,7 @@ def changeHandler2 (msgName, numHandlers, clientData) :
 def test15 () :
   global changed
   IPC_connect("test")
+  IPC_defineMsg("message1", IPC_VARIABLE_LENGTH, "int")
   IPC_subscribeHandlerChange("message1", changeHandler1)
   changed = False
   while (not changed) : IPC_listen(1000)
@@ -524,7 +532,8 @@ def test16 () :
   IPC_connect("test")
   IPC_defineMsg("h", IPC_VARIABLE_LENGTH, "{int, fooType}")
   IPC_defineFormat("fooType", "{string, double}")
-  IPC_subscribeData("h", msgHandler2, dataClass=struct1)
+  IPC_subscribeData("h", msgHandler2)
+  IPC_msgClass("h", struct1)
   ds = IPCdata()
   ds._f0 = 666
   ds._f1 = IPCdata();
@@ -561,7 +570,8 @@ def test17 () :
   IPC_connect("test")
   IPC_defineMsg("f", IPC_VARIABLE_LENGTH, "{int, {string, double}}")
   IPC_defineMsg("g", IPC_VARIABLE_LENGTH, "int")
-  IPC_subscribeData("f", msgHandler4, None, struct1)
+  IPC_subscribeData("f", msgHandler4)
+  IPC_msgClass("f", struct1)
   IPC_subscribeData("g", msgHandler2, None)
   vc = IPC_VARCONTENT_TYPE()
   ds = IPCdata()
@@ -580,7 +590,7 @@ def test17 () :
   print()
 
   IPC_unsubscribe("f", msgHandler4)
-  IPC_subscribeData("f", msgHandler5, None, struct1)
+  IPC_subscribeData("f", msgHandler5)
   print("IPC_queryResponseData:", IPC_queryResponseData("f", ds, 5000))
   IPC_defineMsg("h", IPC_VARIABLE_LENGTH, None)
   ds._f0 = 0
@@ -599,7 +609,8 @@ def test18 () :
   IPC_connect("test")
   IPC_defineMsg("f", IPC_VARIABLE_LENGTH, "{int, {string, double}}")
   IPC_defineMsg("g", IPC_VARIABLE_LENGTH, "int")
-  IPC_subscribeData("f", msgHandler4, None, struct1)
+  IPC_subscribeData("f", msgHandler4)
+  IPC_msgClass("f", struct1)
   vc = IPC_VARCONTENT_TYPE()
   ds = IPCdata()
   ds._f0 = 666
@@ -642,7 +653,8 @@ def test19 () :
   done = False; count = 0
   IPC_connect("test")
   IPC_addTimer(1000, 3, timerHnd1, None)
-  (ref, retval) = IPC_addTimerGetRef(500, 2, timerHnd2, done)
+  ref = TIMER_REF_CONTAINER_TYPE()
+  IPC_addTimerGetRef(500, 2, timerHnd2, done, ref)
   IPC_addPeriodicTimer(1250, timerHnd3, IPCdata())
   while (not done) :
     IPC_listen(1000)

@@ -31,7 +31,7 @@
 
 import _IPC # C functions
 import sys
-from IPC import Raise
+import IPC # to get Raise, for some reason from IPC import Raise doesn't work
 
 INT_FMT       = 1
 BOOLEAN_FMT   = 2
@@ -81,7 +81,7 @@ def findClass (className, parent=None) :
       module = sys.modules['__main__']
     return module.__dict__[split[slen-1]]
   except KeyError :
-    Raise('%s not a valid class name' % className)
+    IPC.Raise('%s not a valid class name' % className)
 
 def getNthFieldClass (object, n) :
   try :
@@ -105,7 +105,7 @@ def getField (object, n, theClass=None) :
      if (theClass is None or isinstance(field, theClass)) :
        return field
      else :
-       Raise("getField: %r not of class %s" % (field, theClass.__name__))
+       IPC.Raise("getField: %r not of class %s" % (field, theClass.__name__))
   except KeyError:
     return None
 
@@ -117,22 +117,22 @@ def setCharField (object, n, theChar) :
   if (isinstance(theChar, str) and len(theChar) == 1) :
     return setField(object, n, theChar)
   else :
-    Raise("%s is not a single character" % theChar)
+    IPC.Raise("%s is not a single character" % theChar)
 
 def getCharField (object, n) :
   theChar = getField(object, n, str)
   if (not theChar is None and len(theChar) == 1) :
     return theChar
   else:
-    Raise("%s (field %s of %s) is not a single character" % \
-          (theChar, getNthFieldName(object, n), object))
+    IPC.Raise("%s (field %s of %s) is not a single character" % \
+              (theChar, getNthFieldName(object, n), object))
 
 def setBooleanField (object, n, theBoolean) :
   if (theBoolean in (0, 1)) :
     if (theBoolean == 1) : return setField(object, n, True)
     else : return setField(object, n, False)
   else :
-    Raise("%s is not Boolean" % theBoolean)
+    IPC.Raise("%s is not Boolean" % theBoolean)
 
 def getBooleanField (object, n) :
   theBoolean = getField(object, n, bool)
@@ -140,106 +140,106 @@ def getBooleanField (object, n) :
     if (theBoolean == True) : return 1
     else : return 0
   else:
-    Raise("%s (field %s of %s) is not Boolean" % \
-          (theBoolean, getNthFieldName(object, n), object))
+    IPC.Raise("%s (field %s of %s) is not Boolean" % \
+              (theBoolean, getNthFieldName(object, n), object))
 
 def setByteField (object, n, theByte) :
   if (isinstance(theByte, int) and abs(theByte) <= 0XFF) :
     return setField(object, n, theByte)
   else :
-    Raise("%s is not a byte" % theByte)
+    IPC.Raise("%s is not a byte" % theByte)
 
 def getByteField (object, n) :
   theByte = getField(object, n, int)
   if (not theByte is None and abs(theByte) <= 0XFF) :
     return theByte
   else:
-    Raise("%s (field %s of %s) is not a byte" % \
-          (theByte, getNthFieldName(object, n), object))
+    IPC.Raise("%s (field %s of %s) is not a byte" % \
+              (theByte, getNthFieldName(object, n), object))
 
 def setIntField (object, n, theInt) :
   if (isinstance(theInt, int) and abs(theInt) <= 0XFFFFFFFF) :
     return setField(object, n, theInt)
   else :
-    Raise("%s is not a int" % theInt)
+    IPC.Raise("%s is not a int" % theInt)
 
 def getIntField (object, n) :
   theInt = getField(object, n, int)
   if (not theInt is None and abs(theInt) <= 0XFFFFFF) :
     return theInt
   else:
-    Raise("%s (field %s of %s) is not an int" % \
-          (theInt, getNthFieldName(object, n), object))
+    IPC.Raise("%s (field %s of %s) is not an int" % \
+              (theInt, getNthFieldName(object, n), object))
 
 def setShortField (object, n, theShort) :
   if (isinstance(theShort, int) and abs(theShort) <= 0XFFFF) :
     return setField(object, n, theShort)
   else :
-    Raise("%s is not a short" % theShort)
+    IPC.Raise("%s is not a short" % theShort)
 
 def getShortField (object, n) :
   theShort = getField(object, n, int)
   if (not theShort is None and abs(theShort) <= 0XFFFF) :
     return theShort
   else:
-    Raise("%s (field %s of %s) is not a short" % \
-          (theShort, getNthFieldName(object, n), object))
+    IPC.Raise("%s (field %s of %s) is not a short" % \
+              (theShort, getNthFieldName(object, n), object))
 
 def setLongField (object, n, theLong) :
   if (isinstance(theLong, int)) :
     return setField(object, n, theLong)
   else :
-    Raise("%s is not a long" % theLong)
+    IPC.Raise("%s is not a long" % theLong)
 
 def getLongField (object, n) :
   theLong = getField(object, n, int)
   if (not theLong is None) :
     return theLong
   else:
-    Raise("%s (field %s of %s) is not a long" % \
-          (theLong, getNthFieldName(object, n), object))
+    IPC.Raise("%s (field %s of %s) is not a long" % \
+              (theLong, getNthFieldName(object, n), object))
 
 def setFloatField (object, n, theFloat) :
   if (isinstance(theFloat, float)) :
     return setField(object, n, theFloat)
   else :
-    Raise("%s is not a float" % theFloat)
+    IPC.Raise("%s is not a float" % theFloat)
 
 def getFloatField (object, n) :
   theFloat = getField(object, n, float)
   if (not theFloat is None) :
     return theFloat
   else:
-    Raise("%s (field %s of %s) is not a float" % \
-          (theFloat, getNthFieldName(object, n), object))
+    IPC.Raise("%s (field %s of %s) is not a float" % \
+              (theFloat, getNthFieldName(object, n), object))
 
 def setDoubleField (object, n, theDouble) :
   if (isinstance(theDouble, float)) :
     return setField(object, n, theDouble)
   else :
-    Raise("%s is not a double" % theDouble)
+    IPC.Raise("%s is not a double" % theDouble)
 
 def getDoubleField (object, n) :
   theDouble = getField(object, n, float)
   if (not theDouble is None) :
     return theDouble
   else:
-    Raise("%s (field %s of %s) is not a double" % \
-          (theDouble, getNthFieldName(object, n), object))
+    IPC.Raise("%s (field %s of %s) is not a double" % \
+              (theDouble, getNthFieldName(object, n), object))
 
 def setStringField (object, n, theString) :
   if (isinstance(theString, str)) :
     return setField(object, n, theString)
   else :
-    Raise("%s is not a string" % theString)
+    IPC.Raise("%s is not a string" % theString)
 
 def getStringField (object, n) :
   theString = getField(object, n, str)
   if (not theString is None) :
     return theString
   else:
-    Raise("%s (field %s of %s) is not a string" % \
-          (theString, getNthFieldName(object, n), object))
+    IPC.Raise("%s (field %s of %s) is not a string" % \
+              (theString, getNthFieldName(object, n), object))
 
 def setObjectField (object, n, theObject) :
   return setField(object, n, theObject)
@@ -500,7 +500,8 @@ class UINT_Trans(TransFormat) :
     _IPC.decodeUIntArray(array, len, buffer)
 
 class LONG_Trans(TransFormat) :
-  def __init__(self) : self.typeSize = LONG_SIZE; self.primType = int
+  # 8 byte longs not yet implemented
+  def __init__(self) : self.typeSize = INT_SIZE; self.primType = int
 
   def Encode (self, dataStruct, dstart, buffer) :
     theLong = getLongField(dataStruct, dstart)
@@ -510,7 +511,7 @@ class LONG_Trans(TransFormat) :
     #elif (0 <= theLong < 0XFFFFFFFFFFFFFFFF) :
     #  _IPC.formatPutLong(buffer, theLong)
     else :
-      Raise("Will lose precision in transferring long: %d" % theLong)
+      IPC.Raise("Will lose precision in transferring long: %d" % theLong)
 
   def Decode (self, dataStruct, dstart, buffer) :
 #    setLongField(dataStruct, dstart, _IPC.formatGetLong(buffer))
@@ -524,7 +525,7 @@ class LONG_Trans(TransFormat) :
     #elif (0 <= theLong < 0XFFFFFFFFFFFFFFFF) :
     #  _IPC.formatPutLong(buffer, theLong)
     else :
-      Raise("Will lose precision in transferring long: %d" % theLong)
+      IPC.Raise("Will lose precision in transferring long: %d" % theLong)
 
   def DecodeElement(self, array, index, buffer) :
 #    array[index] = _IPC.formatGetLong(buffer)
@@ -577,7 +578,7 @@ def pickTrans (type) :
     fn = TransFormatArray[type];
     if (not fn is None) :
       return fn
-  Raise("pickTrans: Unhandled format %s" % type)
+  IPC.Raise("pickTrans: Unhandled format %s" % type)
 
 
 def Encode(type, dataStruct, dstart, buffer) :

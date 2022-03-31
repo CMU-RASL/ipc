@@ -157,7 +157,8 @@ IPC_RETURN_TYPE IPC_queryNotify (const char *msgName,
 IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName, 
 				    unsigned int length, BYTE_ARRAY content,
 				    BYTE_ARRAY *replyHandle,
-				    FORMATTER_PTR *replyFormatter,
+				    FORMATTER_PTR *replyFormatterPtr,
+				    const char **responseMsgNamePtr,
 				    unsigned int timeoutMsecs)
 {
   unsigned long quitTime = WAITFOREVER, now;
@@ -168,6 +169,7 @@ IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName,
   queryReplyData.handled = FALSE;
   queryReplyData.data = NULL;
   queryReplyData.formatter = (FORMATTER_PTR)NULL;
+  queryReplyData.msgName = NULL;
 
   if (timeoutMsecs != IPC_WAIT_FOREVER) {
     /* When to timeout */
@@ -228,7 +230,8 @@ IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName,
       UNLOCK_M_MUTEX;
 #endif /* LISP */
       *replyHandle = queryReplyData.data;
-      if (replyFormatter) *replyFormatter = queryReplyData.formatter;
+      if (replyFormatterPtr) *replyFormatterPtr = queryReplyData.formatter;
+      if (responseMsgNamePtr) *responseMsgNamePtr = queryReplyData.msgName;
     }
 
     return retVal;
@@ -241,7 +244,7 @@ IPC_RETURN_TYPE IPC_queryResponse (const char *msgName,
 				   unsigned int timeoutMsecs)
 {
   return _IPC_queryResponse(msgName, length, content, 
-			    replyHandle, NULL, timeoutMsecs);
+			    replyHandle, NULL, NULL, timeoutMsecs);
 }
 
 IPC_RETURN_TYPE IPC_respondVC (MSG_INSTANCE msgInstance, const char *msgName,
@@ -277,7 +280,7 @@ IPC_RETURN_TYPE IPC_queryResponseVC (const char *msgName,
     RETURN_ERROR(IPC_Null_Argument);
   } else {
     return _IPC_queryResponse(msgName, varcontent->length, varcontent->content,
-			      replyHandle, NULL, timeoutMsecs);
+			      replyHandle, NULL, NULL, timeoutMsecs);
   }
 }
 
@@ -296,6 +299,7 @@ static void queryReplyHandler (MSG_INSTANCE msgRef, BYTE_ARRAY callData,
   queryReplyData->handled = TRUE;
   queryReplyData->data = callData;
   queryReplyData->formatter = IPC_msgInstanceFormatter(msgRef);
+  queryReplyData->msgName = IPC_msgInstanceName(msgRef);
 }
 
 static BOOLEAN testQueryReplyData (QUERY_REPLY_PTR queryReply,

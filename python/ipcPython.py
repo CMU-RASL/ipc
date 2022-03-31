@@ -292,11 +292,10 @@ def IPC_queryResponseVC (msgName, varcontent, timeout) :
 def IPC_marshall (formatter, data, varcontent) :
   return formatters.marshall(formatter, data, varcontent)
 
-def IPC_unmarshall (formatter, bytearray, object) :
- (obj, ret) = formatters.unmarshall(formatter, bytearray, object, None)
- return ret
+def IPC_unmarshall (formatter, bytearray, object=None) :
+ return formatters.unmarshall(formatter, bytearray, object, None)
 
-def IPC_unmarshallData (formatter, bytearray, oclass) :
+def IPC_unmarshallData (formatter, bytearray, oclass=None) :
   return formatters.unmarshall(formatter, bytearray, None, oclass)
 
 def IPC_publishData (msgName, data) :
@@ -368,7 +367,7 @@ def IPC_queryResponseData (msgName, data, timeoutMSecs) :
       if (varcontent.content != 0) : IPC_freeByteArray(varcontent.content)
       if (ret == IPC_OK) :
         responseClass = getMsgClass(replyFormat.msgName,
-                                    replyFormat.formatter);
+                                    replyFormat.formatter)
         (responseObject, ret) = formatters.unmarshall(replyFormat.formatter,
                                                       vc.content,
 						      oclass=responseClass)
@@ -450,8 +449,11 @@ def IPC_removeTimerByRef (timerRef) :
   print("Timer with ref (%s) does not exist" % timerRef.timerRef)
   return IPC_OK
 
+from formatters import formatType, PrimitiveFMT
+
 def getMsgClass (msgName, formatter) :
   if (formatter == None) : return None
+  elif (formatType(formatter) == PrimitiveFMT): return None
   else :
     try : return msgClassHashTable[msgName]
     except :

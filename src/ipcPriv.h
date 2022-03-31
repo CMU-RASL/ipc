@@ -374,8 +374,8 @@
 /* Interal version control */
 #define IPC_VERSION_MAJOR  3
 #define IPC_VERSION_MINOR  9
-#define IPC_VERSION_MICRO  1
-#define IPC_VERSION_DATE "Aug-16-11"
+#define IPC_VERSION_MICRO  1a
+#define IPC_VERSION_DATE "Mar-31-22"
 #define IPC_COMMIT_DATE "$Date: 2011/08/16 16:01:56 $"
 
 #define MAX_RECONNECT_TRIES (5)
@@ -403,8 +403,8 @@
 typedef struct { BOOLEAN handled;
 		 void *data;
 		 FORMATTER_PTR formatter;
+                 const char *msgName; // Added 7/13 -- needed for Java port
 	       } QUERY_REPLY_TYPE, *QUERY_REPLY_PTR;
-
 
 typedef struct { 
   CONNECT_HANDLE_TYPE handler; 
@@ -468,7 +468,8 @@ extern IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName,
 					   unsigned int length,
 					   BYTE_ARRAY content,
 					   BYTE_ARRAY *replyHandle,
-					   FORMATTER_PTR *replyFormatter,
+					   FORMATTER_PTR *replyFormatterPtr,
+					   const char **responseMsgNamePtr,
 					   unsigned int timeoutMsecs);
 #ifdef macintosh
 #pragma export off

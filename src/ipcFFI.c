@@ -189,6 +189,29 @@ int32 formatGetInt(BUFFER_PTR buffer)
   return i;
 }
 
+void formatPutLong(BUFFER_PTR buffer, long l)
+{
+  buffer->bstart += x_ipc_LONG_Trans_Encode((GENERIC_DATA_PTR)&l,
+					    0, buffer->buffer, buffer->bstart);
+}
+
+long formatGetLong(BUFFER_PTR buffer)
+{
+  long l;
+  int byteOrder;
+  ALIGNMENT_TYPE alignment;
+
+  LOCK_M_MUTEX;
+  byteOrder = GET_M_GLOBAL(byteOrder);
+  alignment = GET_M_GLOBAL(alignment);
+  UNLOCK_M_MUTEX;
+  
+  buffer->bstart += x_ipc_LONG_Trans_Decode((GENERIC_DATA_PTR)&l, 
+					    0, buffer->buffer, buffer->bstart,
+					    byteOrder, alignment);
+  return l;
+}
+
 double formatGetFloat(BUFFER_PTR buffer)
 {
   float f;

@@ -377,7 +377,8 @@ IPC_RETURN_TYPE IPC_queryResponseData (const char *msgName,
     PASS_ON_ERROR();
   } else {
     retVal = _IPC_queryResponse(msgName, varcontent.length, varcontent.content,
-				&replyByteArray, &decodeFormat, timeoutMsecs);
+				&replyByteArray, &decodeFormat, NULL,
+				timeoutMsecs);
     if (retVal == IPC_OK) {
       retVal = _IPC_unmarshall(decodeFormat, replyByteArray, replyData, TRUE);
       if (replyByteArray != replyData) x_ipcFree(replyByteArray);

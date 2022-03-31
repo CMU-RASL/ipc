@@ -67,6 +67,8 @@ void formatPutShort(BUFFER_PTR buffer, int32 i);
 int32 formatGetShort(BUFFER_PTR buffer);
 void formatPutInt(BUFFER_PTR buffer, int32 i);
 int32 formatGetInt(BUFFER_PTR buffer);
+void formatPutLong(BUFFER_PTR buffer, long l);
+long formatGetLong(BUFFER_PTR buffer);
 double formatGetFloat(BUFFER_PTR buffer);
 void formatPutFloat(BUFFER_PTR buffer, double f);
 double formatGetDouble(BUFFER_PTR buffer);
