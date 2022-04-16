@@ -374,9 +374,9 @@
 /* Interal version control */
 #define IPC_VERSION_MAJOR  3
 #define IPC_VERSION_MINOR  9
-#define IPC_VERSION_MICRO  1a
+#define IPC_VERSION_MICRO  2
 #define IPC_VERSION_DATE "Mar-31-22"
-#define IPC_COMMIT_DATE "$Date: 2011/08/16 16:01:56 $"
+#define IPC_COMMIT_DATE "$Date: 2022/03/31$"
 
 #define MAX_RECONNECT_TRIES (5)
 #define RECONNECT_WAIT      (1) /* seconds */
