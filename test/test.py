@@ -185,7 +185,7 @@ def test4 () :
     IPC_initialize()
     fmt1 = IPC_parseFormat("[int :5]")
     vc1 = IPC_VARCONTENT_TYPE()
-    ds1 = range(10,15)
+    ds1 = list(range(10,15))
     IPC_marshall(fmt1, ds1, vc1)
     printVC(vc1)
     ds1a = [None]*5
@@ -208,7 +208,7 @@ def test4 () :
     vc3 = IPC_VARCONTENT_TYPE()
     ds3 = [None]*3; ds3a = [None]*3
     for i in range(0, 3) :
-        ds3[i] = range(pow(i+1,2), pow(i+1,2)+4)
+        ds3[i] = list(range(pow(i+1,2), pow(i+1,2)+4))
         ds3a[i] = [None]*4
     IPC_marshall(fmt3, ds3, vc3)
     printVC(vc3)
@@ -240,7 +240,7 @@ def test5 () :
     fmt1 = IPC_parseFormat("{int, <int :1>}")
     vc1 = IPC_VARCONTENT_TYPE()
     ds1 = struct4(); ds1a = struct4()
-    ds1.num = 5; ds1.ar = range(111,116)
+    ds1.num = 5; ds1.ar = list(range(111,116))
     IPC_marshall(fmt1, ds1, vc1)
     printVC(vc1)
     IPC_unmarshall(fmt1, vc1.content, ds1a)
@@ -263,7 +263,8 @@ def test5 () :
     vc3 = IPC_VARCONTENT_TYPE()
     ds3 = struct6()
     ds3.dim1 = 3; ds3.dim2 = 4; ds3.ar = [None]*ds3.dim1
-    for i in range(0, 3) : ds3.ar[i] = range(pow(i+1,2), pow(i+1,2)+ds3.dim2)
+    for i in range(0, 3) :
+        ds3.ar[i] = list(range(pow(i+1,2), pow(i+1,2)+ds3.dim2))
     IPC_marshall(fmt3, ds3, vc3)
     printVC(vc3)
     ds3a = struct6();
