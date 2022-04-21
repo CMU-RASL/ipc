@@ -40,17 +40,17 @@ import IPC
 from module import *
 
 def msg1Handler (msgRef, callData, clientData) :
-  print "msg1Handler: Receiving %s (%d) [%s] " % \
-	(IPC.IPC_msgInstanceName(msgRef), callData, clientData)
+  print("msg1Handler: Receiving %s (%d) [%s] " % \
+	(IPC.IPC_msgInstanceName(msgRef), callData, clientData))
 
 def queryHandler (msgRef, t1, clientData) :
-  print "queryHandler: Receiving %s [%s]",  \
-	(IPC.IPC_msgInstanceName(msgRef), clientData)
+  print("queryHandler: Receiving %s [%s]",  \
+	(IPC.IPC_msgInstanceName(msgRef), clientData))
   IPC.IPC_printData(IPC.IPC_msgInstanceFormatter(msgRef), sys.stdout, t1)
 
   # Publish this message -- all subscribers get it
   str1 = "Hello, world"
-  print '\n  IPC.IPC_publishData(%s, "%s")' % (MSG2, str1)
+  print('\n  IPC.IPC_publishData(%s, "%s")' % (MSG2, str1))
   IPC.IPC_publishData(MSG2, str1)
 
   t2 =  T2()
@@ -62,7 +62,7 @@ def queryHandler (msgRef, t1, clientData) :
   t2.status = ReceiveVal
 
   # Respond with this message -- only the query handler gets it 
-  print "\n  IPC.IPC_respondData(%s, %s, %s)" % (msgRef, RESPONSE1, t2)
+  print("\n  IPC.IPC_respondData(%s, %s, %s)" % (msgRef, RESPONSE1, t2))
   IPC.IPC_respondData(msgRef, RESPONSE1, t2)
 
 done = False
@@ -75,40 +75,42 @@ def stdinHnd (fd, clientData) :
     IPC.IPC_disconnect()
     done = True
   else :
-    print "stdinHnd [%s]: Received %s" % (clientData, input)
+    print("stdinHnd [%s]: Received %s" % (clientData, input))
 
 def main () :
   global done
   done = False
   # Connect to the central server
-  print "\nIPC.IPC_connect(%s)" % MODULE2_NAME
+  print("\nIPC.IPC_connect(%s)" % MODULE2_NAME)
   IPC.IPC_connect(MODULE2_NAME)
 
   # Define the messages that this module publishes
-  print "\nIPC.IPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % \
-        (MSG2, MSG2_FORMAT)
+  print("\nIPC.IPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % \
+        (MSG2, MSG2_FORMAT))
   IPC.IPC_defineMsg(MSG2, IPC.IPC_VARIABLE_LENGTH, MSG2_FORMAT)
 
-  print "\nIPC.IPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % \
-        (RESPONSE1, RESPONSE1_FORMAT)
+  print("\nIPC.IPC_defineMsg(%s, IPC_VARIABLE_LENGTH, %s)" % \
+        (RESPONSE1, RESPONSE1_FORMAT))
   IPC.IPC_defineMsg(RESPONSE1, IPC.IPC_VARIABLE_LENGTH, RESPONSE1_FORMAT)
   IPC.IPC_msgClass(RESPONSE1, T2)
 
   # Subscribe to the messages that this module listens to
-  print "\nIPC.IPC_subscribeData(%s,%s, %s)" % \
-        (MSG1, msg1Handler.__name__, MODULE2_NAME)
+  print("\nIPC.IPC_subscribeData(%s,%s, %s)" % \
+        (MSG1, msg1Handler.__name__, MODULE2_NAME))
   IPC.IPC_subscribeData(MSG1, msg1Handler, MODULE2_NAME)
 
-  print "\nIPC.IPC_subscribeData(%s, %s, %s, %s)" % \
-        (QUERY1 , queryHandler.__name__, MODULE2_NAME, T1.__name__)
+  print("\nIPC.IPC_subscribeData(%s, %s, %s, %s)" % \
+        (QUERY1 , queryHandler.__name__, MODULE2_NAME, T1.__name__))
   IPC.IPC_subscribeData(QUERY1, queryHandler, MODULE2_NAME)
 
   # Subscribe a handler for tty input. Typing "q" will quit the program.
-  print "\nIPC_subscribeFD(%d, stdinHnd, %s)" % \
-        (sys.stdin.fileno(), MODULE2_NAME)
+  print("\nIPC_subscribeFD(%d, stdinHnd, %s)" % \
+        (sys.stdin.fileno(), MODULE2_NAME))
   IPC.IPC_subscribeFD(sys.stdin.fileno(), stdinHnd, MODULE2_NAME)
 
-  print "\nType 'q' to quit"
+  print("\nType 'q' to quit")
   while (not done) : IPC.IPC_listen(250)
 
   IPC.IPC_disconnect()
+
+if __name__ == "__main__": main()
