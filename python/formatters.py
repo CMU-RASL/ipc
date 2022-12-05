@@ -363,8 +363,8 @@ def transferToDataStructure (format, dataStruct, dStart, buffer, parentFormat,
       primFmttrs.setObjectField(dataStruct, dStart, None)
     else :
       transferToDataStructure(_IPC.formatChoosePtrFormat(format, parentFormat),
- 		              dataStruct, dStart, buffer, 0, isTopLevelStruct,
-                              oclass)
+ 		              dataStruct, dStart, buffer, None,
+                              isTopLevelStruct, oclass)
   elif (ftype == StructFMT) :
     formatArray = _IPC.formatFormatArray(format)
     structStart = 0
@@ -431,7 +431,7 @@ def encodeData (formatter, object, buffer) :
   transferToBuffer(formatter, object, 0, buffer, 0, True)
 
 def decodeData (formatter, buffer, object, oclass) :
-  transferToDataStructure(formatter, object, 0, buffer, 0, True, oclass)
+  transferToDataStructure(formatter, object, 0, buffer, None, True, oclass)
 
 # Marshalls the object into a byte array.
 # Fills in the IPC_VARCONTENT structure with the length and byteArray.
@@ -457,7 +457,7 @@ def marshall (formatter, object, varcontent) :
 # Uses the object if passed (and if the formatter is a struct or array)
 def unmarshall (formatter, byteArray, object=None, oclass=None) :
   if (not checkMarshallStatus(formatter)) :
-    return _IPC.IPC_Error
+    return (None, _IPC.IPC_Error)
   elif (validFormatter(formatter)) :
     buffer = createBuffer(byteArray)
     needEnclosingObject = not _IPC.formatType(formatter) in \

@@ -370,7 +370,7 @@ def IPC_queryResponseData (msgName, data, timeoutMSecs) :
                                     replyFormat.formatter)
         (responseObject, ret) = formatters.unmarshall(replyFormat.formatter,
                                                       vc.content,
-						      oclass=responseClass)
+                                                      oclass=responseClass)
         if (vc.content != 0) : IPC_freeByteArray(vc.content)
     else : return (None, IPC_Error)
   except : print(exc_info()); return (None, IPC_Error)
