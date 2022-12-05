@@ -169,7 +169,7 @@ IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName,
   queryReplyData.handled = FALSE;
   queryReplyData.data = NULL;
   queryReplyData.formatter = (FORMATTER_PTR)NULL;
-  queryReplyData.msgName = NULL;
+  memset(queryReplyData.msgName, 0, sizeof(queryReplyData.msgName));
 
   if (timeoutMsecs != IPC_WAIT_FOREVER) {
     /* When to timeout */
@@ -231,9 +231,8 @@ IPC_RETURN_TYPE _IPC_queryResponse (const char *msgName,
 #endif /* LISP */
       *replyHandle = queryReplyData.data;
       if (replyFormatterPtr) *replyFormatterPtr = queryReplyData.formatter;
-      if (responseMsgNamePtr) *responseMsgNamePtr = queryReplyData.msgName;
+      if (responseMsgNamePtr) *responseMsgNamePtr = strdup(queryReplyData.msgName);
     }
-
     return retVal;
   }
 }
@@ -299,7 +298,12 @@ static void queryReplyHandler (MSG_INSTANCE msgRef, BYTE_ARRAY callData,
   queryReplyData->handled = TRUE;
   queryReplyData->data = callData;
   queryReplyData->formatter = IPC_msgInstanceFormatter(msgRef);
-  queryReplyData->msgName = IPC_msgInstanceName(msgRef);
+  if (sizeof(queryReplyData->msgName) < strlen(IPC_msgInstanceName(msgRef))) {
+    fprintf(stderr, "WARNING: queryReplyHandler: Too long msgName: %s\n",
+	    IPC_msgInstanceName(msgRef));
+  }
+  memcpy(queryReplyData->msgName, IPC_msgInstanceName(msgRef),
+	 sizeof(queryReplyData->msgName));
 }
 
 static BOOLEAN testQueryReplyData (QUERY_REPLY_PTR queryReply,

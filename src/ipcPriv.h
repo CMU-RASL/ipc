@@ -403,7 +403,9 @@
 typedef struct { BOOLEAN handled;
 		 void *data;
 		 FORMATTER_PTR formatter;
-                 const char *msgName; // Added 7/13 -- needed for Java port
+                 /* Will fail for long message names, but needed to
+                    prevent segfaults when the strings are freed */
+                 char msgName[100];
 	       } QUERY_REPLY_TYPE, *QUERY_REPLY_PTR;
 
 typedef struct { 

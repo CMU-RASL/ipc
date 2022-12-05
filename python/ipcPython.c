@@ -150,6 +150,8 @@ IPC_RETURN_TYPE queryResponse (const char *msgName, unsigned int length,
   if (replyFormatContainer != NULL) {
     replyFormatContainer->formatter = replyFormat;
     replyFormatContainer->msgName = (char *)replyMsgName;
+  } else {
+    free((void *)replyMsgName);
   }
   return ret;
 }
@@ -344,7 +346,6 @@ void encodeBooleanArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
 
 void decodeBooleanArray (PyObject *pyArray, int32 len, BUFFER_PTR buffer)
 {
-  fprintf(stderr, "HERE\n");
   int i;
   for (i=0; i<len; i++) {
     PySequence_SetItem(pyArray, i,
