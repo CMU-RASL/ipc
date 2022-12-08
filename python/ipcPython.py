@@ -338,21 +338,18 @@ def IPC_queryNotifyData (msgName, data, handler, clientData=None) :
   queryHashTable[handlerNumber] =(handler, clientData, True)
 
   varcontent = IPC_VARCONTENT_TYPE()
-  if (data == None) :
-    varcontent.length = 0
-    varcontent.content = None
-    return _IPC.IPC_publish(msgName, 0, None)
-  else :
-    try :
-      if (formatters.marshall(IPC_msgFormatter(msgName), data, varcontent) ==
+  try :
+    if (data == None) :
+      varcontent.length = 0
+      varcontent.content = None
+    elif (formatters.marshall(IPC_msgFormatter(msgName), data, varcontent) ==
           IPC_Error) :
-        return IPC_Error
-      else :
-        retVal = queryNotify(msgName, varcontent.length, 
-	  	             varcontent.content, handlerNumber)
-        if (varcontent.content != 0) : IPC_freeByteArray(varcontent.content)
-        return retVal
-    except : return IPC_ERROR
+      return IPC_Error
+    retVal = queryNotify(msgName, varcontent.length, 
+                         varcontent.content, handlerNumber)
+    if (varcontent.length > 0) : IPC_freeByteArray(varcontent.content)
+    return retVal
+  except : return IPC_ERROR
 
 def IPC_queryResponseData (msgName, data, timeoutMSecs) :
   try :

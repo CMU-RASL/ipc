@@ -347,7 +347,6 @@ def transferToBuffer (format, dataStruct, dStart, buffer, parentFormat,
 def transferToDataStructure (format, dataStruct, dStart, buffer, parentFormat,
                              isTopLevelStruct, oclass=None) :
   ftype = _IPC.formatType(format)
-
   if (ftype == LengthFMT) :
     IPC.Raise("Python version of IPC can only use explicit formats")
   elif (ftype == PrimitiveFMT) :
@@ -362,9 +361,11 @@ def transferToDataStructure (format, dataStruct, dStart, buffer, parentFormat,
     if (theChar == '\0') :
       primFmttrs.setObjectField(dataStruct, dStart, None)
     else :
+      if (isTopLevelStruct and oclass):
+        primFmttrs.setObjectField(dataStruct, dStart, oclass())
       transferToDataStructure(_IPC.formatChoosePtrFormat(format, parentFormat),
  		              dataStruct, dStart, buffer, None,
-                              isTopLevelStruct, oclass)
+                              False, oclass)
   elif (ftype == StructFMT) :
     formatArray = _IPC.formatFormatArray(format)
     structStart = 0
@@ -454,25 +455,25 @@ def marshall (formatter, object, varcontent) :
 
 # Creates an object according to the formatter and byteArray (both C pointers).
 # Returns a tuple of the object created any error conditions.
-# Uses the object if passed (and if the formatter is a struct or array)
+# Uses the object if passed (and if formatter is a struct or array)
 def unmarshall (formatter, byteArray, object=None, oclass=None) :
   if (not checkMarshallStatus(formatter)) :
     return (None, _IPC.IPC_Error)
   elif (validFormatter(formatter)) :
     buffer = createBuffer(byteArray)
-    needEnclosingObject = not _IPC.formatType(formatter) in \
-                              (StructFMT, FixedArrayFMT, VarArrayFMT)
+    ftype = _IPC.formatType(formatter)
+    needEnclosingObject = not ftype in (StructFMT, FixedArrayFMT, VarArrayFMT)
     if (needEnclosingObject or object is None) :
-      needEnclosingObject = (_IPC.formatType(formatter) != StructFMT)
-      if (oclass is None or needEnclosingObject) : theObject = IPCdata()
-      else : theObject = oclass()
+      needEnclosingObject = ftype != StructFMT
+      theObject = (IPCdata() if (oclass is None or needEnclosingObject) else
+                   oclass())
     else :
       if (not oclass is None and not isinstance(object, oclass)) :
         IPC.Raise("unmarshall: Object %s and class %s do not match" % \
                   (object, oclass))
       theObject = object
     decodeData(formatter, buffer, theObject, oclass)
-    if (needEnclosingObject) : theObject = theObject._f0
+    if (needEnclosingObject): theObject = theObject._f0
     _IPC.freeBuffer(buffer)
     return (theObject, _IPC.IPC_OK)
   else :
