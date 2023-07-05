@@ -96,19 +96,19 @@ def IPC_initialize() :
 
 def IPC_connectModule(*args) :
   init_python_ipc()
-  _IPC.IPC_connectModule(*args)
+  return _IPC.IPC_connectModule(*args)
 
 def IPC_connect(*args) :
   init_python_ipc()
-  _IPC.IPC_connect(*args)
+  return _IPC.IPC_connect(*args)
 
 def IPC_connectModuleNoListen(*args) :
   init_python_ipc()
-  _IPC.IPC_connectModuleNoListen(*args)
+  return _IPC.IPC_connectModuleNoListen(*args)
 
 def IPC_connectNoListen(*args) :
   init_python_ipc()
-  _IPC.IPC_connectNoListen(*args)
+  return _IPC.IPC_connectNoListen(*args)
 
 def IPC_isConnected () :
   return boolVal(_IPC.IPC_isConnected())
@@ -207,7 +207,7 @@ def IPC_subscribeDisconnect (disconnectHandler, clientData=None) :
 def IPC_unsubscribeConnect (connectHandler) :
   hndData = findExisting(connectHandler, connectHandlers)
   if (hndData is None) :
-    print("IPC_unsubscribeConnect: Connect handler %s not found " 
+    print("IPC_unsubscribeConnect: Connect handler %s not found "
           %connectHandler.__name__)
     return IPC_Error
   else :
@@ -478,8 +478,8 @@ def msgCallbackHandler (msgInstance, byteArray, key) :
       else :
         handlerData[0](msgInstance, byteArray, handlerData[1])
     except: 
-      print("Handler failed: %s: %s" % \
-            (exc_info()[0].__name__, exc_info()[1].message))
+      print("Handler failed1", exc_info())
+            #%(exc_info()[0].__name__, exc_info()[1].message))
       raise
 
 def queryCallbackHandler (msgInstance, byteArray, key) :
@@ -505,8 +505,8 @@ def queryCallbackHandler (msgInstance, byteArray, key) :
       else :
         handlerData[0](msgInstance, byteArray, handlerData[1])
     except: 
-      print("Handler failed: %s: %s"
-            %(exc_info()[0].__name__, exc_info()[1].message))
+      print("Handler failed2: %s" %exc_info())
+            #%(exc_info()[0].__name__, exc_info()[1].message))
       raise
 
 
