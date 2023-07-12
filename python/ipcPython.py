@@ -96,19 +96,19 @@ def IPC_initialize() :
 
 def IPC_connectModule(*args) :
   init_python_ipc()
-  _IPC.IPC_connectModule(*args)
+  return _IPC.IPC_connectModule(*args)
 
 def IPC_connect(*args) :
   init_python_ipc()
-  _IPC.IPC_connect(*args)
+  return _IPC.IPC_connect(*args)
 
 def IPC_connectModuleNoListen(*args) :
   init_python_ipc()
-  _IPC.IPC_connectModuleNoListen(*args)
+  return _IPC.IPC_connectModuleNoListen(*args)
 
 def IPC_connectNoListen(*args) :
   init_python_ipc()
-  _IPC.IPC_connectNoListen(*args)
+  return _IPC.IPC_connectNoListen(*args)
 
 def IPC_isConnected () :
   return boolVal(_IPC.IPC_isConnected())
@@ -329,7 +329,7 @@ def IPC_respondData (msgInstance, msgName, data) :
       retVal = IPC_respondVC(msgInstance, msgName, varcontent)
       if (varcontent.content != 0) : IPC_freeByteArray(varcontent.content)
       return retVal
-  except : return IPC_ERROR
+  except : return IPC_Error
 
 def IPC_queryNotifyData (msgName, data, handler, clientData=None) :
   global queryHashTable, handlerNumber
@@ -349,7 +349,7 @@ def IPC_queryNotifyData (msgName, data, handler, clientData=None) :
                          varcontent.content, handlerNumber)
     if (varcontent.length > 0) : IPC_freeByteArray(varcontent.content)
     return retVal
-  except : return IPC_ERROR
+  except : return IPC_Error
 
 def IPC_queryResponseData (msgName, data, timeoutMSecs) :
   try :
