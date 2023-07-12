@@ -1,5 +1,7 @@
 The Python version of IPC has currently been tested only under Linux.
 
+Need to install swig, python3-dev, python-is-python3
+
 To make IPC for Python on your system, you will need SWIG (currently tested
 using version 2.0.8).  With SWIG installed, you just type "gmake install"
 and everything should happen automatically.  After completing, you should

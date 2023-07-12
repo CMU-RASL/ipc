@@ -207,7 +207,7 @@ def IPC_subscribeDisconnect (disconnectHandler, clientData=None) :
 def IPC_unsubscribeConnect (connectHandler) :
   hndData = findExisting(connectHandler, connectHandlers)
   if (hndData is None) :
-    print("IPC_unsubscribeConnect: Connect handler %s not found " 
+    print("IPC_unsubscribeConnect: Connect handler %s not found "
           %connectHandler.__name__)
     return IPC_Error
   else :
@@ -478,8 +478,8 @@ def msgCallbackHandler (msgInstance, byteArray, key) :
       else :
         handlerData[0](msgInstance, byteArray, handlerData[1])
     except: 
-      print("Handler failed: %s: %s" % \
-            (exc_info()[0].__name__, exc_info()[1].message))
+      print("Handler failed1", exc_info())
+            #%(exc_info()[0].__name__, exc_info()[1].message))
       raise
 
 def queryCallbackHandler (msgInstance, byteArray, key) :
@@ -505,8 +505,8 @@ def queryCallbackHandler (msgInstance, byteArray, key) :
       else :
         handlerData[0](msgInstance, byteArray, handlerData[1])
     except: 
-      print("Handler failed: %s: %s"
-            %(exc_info()[0].__name__, exc_info()[1].message))
+      print("Handler failed2: %s" %exc_info())
+            #%(exc_info()[0].__name__, exc_info()[1].message))
       raise
 
 
