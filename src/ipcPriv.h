@@ -457,9 +457,14 @@ extern IPC_RETURN_TYPE ipcDataToSend (CONST_FORMAT_PTR format,
  				      unsigned int length, BYTE_ARRAY content,
  				      void **dataHandle,
 				      IPC_VARCONTENT_PTR varcontent);
+/* Provide a portable 'uint' typedef for compilers that don't define it */
+#ifndef HAVE_UINT
+#define HAVE_UINT
+typedef unsigned int uint;
+#endif
 
 extern void ipcHandlerName (const char *msgName, HANDLER_TYPE handler, 
-			    char *hndName, uint hndNameSize);
+				char *hndName, uint hndNameSize);
 
 #ifdef macintosh
 #pragma export on
@@ -494,7 +499,6 @@ void startWinsock (void);
 #endif /* _WINSOCK_ */
 
 #ifdef WIN32
-typedef unsigned int uint;
 #define snprintf sprintf_s
 #endif
 
