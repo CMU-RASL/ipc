@@ -47,14 +47,6 @@
 // the underlying C functions are available to the wrapper functions.
 
 #include "ipc.h"
-extern
-#if PY_VERSION_HEX >= 0x03000000
-PyObject*
-#else
-void
-#endif
-PyInit__IPC(void); // To prevent compiler from complaining
-
 #define NMP_IPC
 #define NEED_DEBUGGING
 #include "ipcFFI.c"

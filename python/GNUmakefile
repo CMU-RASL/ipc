@@ -126,10 +126,10 @@ CFLAGS			+= -O2
 CFLAGS			+= -fPIC # SWIG needs this
 
 ifndef PYTHON_INC_DIR
-PYTHON_INC_DIR		= /usr/include/python3.8
+PYTHON_INC_DIR		= /usr/include/python3.9
 endif
 ifndef PYTHON_LIB_DIR
-PYTHON_LIB_DIR		= /usr/lib/python3.8
+PYTHON_LIB_DIR		= /usr/lib/python3.9
 endif
 INC_PATH		+= -I$(PYTHON_INC_DIR)
 
@@ -210,23 +210,25 @@ IPC_wrap.c : IPC.i ../src/ipcFFI.h ../src/ipcFFI.c \
 	     ipcPython.h ipcPython.c ipcPython.py
 	swig -python $(INC_PATH) -outcurrentdir $<
 
+PYTHON_FLAGS := $(shell python3-config --includes --ldflags)
+
 ifeq ($(THIS_OS),wnt)
 $(LDIR)/$(PYTHONLIB): $(OBJS)
 	$(RM) $@
-	$(LD_SHARED) -o $@ $(OBJS) -L$(PYTHON_LIB_DIR)/config -lpython3.8 \
+	$(LD_SHARED) -o $@ $(OBJS) -L$(PYTHON_LIB_DIR)/config -lpython3.9 \
 	  $(LIB_PATH) -lipc
 else
 ifeq ($(THIS_OS),Darwin)
 $(LDIR)/$(PYTHONLIB): $(OBJS)
 	$(RM) $@
 	cd ../src; $(MAKE) MAKE_SHARED_LIBS=1 install; cd ../python
-	$(LD_SHARED) -o $@ $(OBJS) -L$(PYTHON_LIB_DIR)/config -lpython2.6 \
+	$(LD_SHARED) -o $@ $(OBJS) $(python3-config --includes --ldflags) \
 	  $(PWD)/$(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR)
 else
 $(LDIR)/$(PYTHONLIB): $(OBJS)
 	$(RM) $@
 	cd ../src; $(MAKE) MAKE_SHARED_LIBS=1 install; cd ../python
-	$(LD_SHARED) -o $@ $(OBJS) \
+	$(LD_SHARED) -o $@ $(OBJS)  $(PYTHON_FLAGS) \
 	  $(PWD)/$(PUBLIC_LIB_DIR)/libipc.so.$(IPC_VERSION_MAJOR).$(IPC_VERSION_MINOR)
 	echo $(PWD)/../lib
 endif

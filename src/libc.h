@@ -1180,7 +1180,7 @@ extern void usleep _PARAMS((unsigned));
 #define bcopy(from, to, len) memcpy((void *)(to), (void *)(from), (size_t)len)
 #endif /* THINK_C */
 
-#if defined(WIN32)
+#if defined(WIN32) || defined(_WIN32)
 #define _WINSOCK_
 #endif
 
@@ -1272,7 +1272,8 @@ struct	sockaddr_un {
 #if  defined(_WINSOCK_) && !defined (_WIN95_MSC_) && !defined(WINNT)
 /* Begin Winsock defines */
 
-#include <winsock.h>
+#include <Winsock2.h>
+#include <Windows.h>
 #include <dos.h>
 #include <io.h>
 #include <stdlib.h>

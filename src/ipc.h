@@ -252,8 +252,9 @@ IPC_EXTERN_FUNCTION (int IPC_isConnected,
 IPC_EXTERN_FUNCTION (int IPC_isModuleConnected,
 		     (const char *moduleName));
 
-#if defined(WIN32)
-#include <winsock.h>
+#if defined(_WIN32) || defined(WIN32)
+/* On Windows use Winsock2 for socket/select definitions */
+#include <winsock2.h>
 #else
 #include <sys/select.h>
 #endif
