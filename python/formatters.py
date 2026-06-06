@@ -209,7 +209,8 @@ def bufferSize1 (format, dataStruct, dStart, parentFormat, isTopLevelStruct) :
     bufSize = bufSize + primFmttrs.ELength(primType, dataStruct, dStart)
   elif (ftype == PointerFMT) :
     bufSize = bufSize + 1
-    if (not primFmttrs.getObjectField(dataStruct, dStart) is None) :
+    if ((not isinstance(dataStruct, IPCdata) or
+         primFmttrs.getObjectField(dataStruct, dStart) is not None)) :
       bufSize = bufSize + \
                 bufferSize1(_IPC.formatChoosePtrFormat(format, parentFormat),
                             dataStruct, dStart, 0, isTopLevelStruct)
@@ -275,7 +276,7 @@ def bufferSize1 (format, dataStruct, dStart, parentFormat, isTopLevelStruct) :
 
 def bufferSize (formatter, object, isTopLevelStruct) :
   if (not validFormatter(formatter)) : return 0
-  else : return bufferSize1(formatter, object, 0, 0, isTopLevelStruct)
+  else : return bufferSize1(formatter, object, 0, None, isTopLevelStruct)
 
 def transferToBuffer (format, dataStruct, dStart, buffer, parentFormat, 
                       isTopLevelStruct) :
@@ -291,7 +292,8 @@ def transferToBuffer (format, dataStruct, dStart, buffer, parentFormat,
     primFmttrs.Encode(_IPC.formatPrimitiveProc(format), dataStruct, dStart,
  		      buffer)
   elif (ftype == PointerFMT) :
-    object = primFmttrs.getObjectField(dataStruct, dStart)
+    object = (dataStruct if not isinstance(dataStruct, IPCdata) else
+              primFmttrs.getObjectField(dataStruct, dStart))
     # 'Z' means data, 0 means NIL
     if (object is None) : theChar = '\0'
     else : theChar = 'Z'
@@ -429,7 +431,7 @@ def transferToDataStructure (format, dataStruct, dStart, buffer, parentFormat,
     IPC.Raise("Unhandled format: %s" % ftype)
 
 def encodeData (formatter, object, buffer) :
-  transferToBuffer(formatter, object, 0, buffer, 0, True)
+  transferToBuffer(formatter, object, 0, buffer, None, True)
 
 def decodeData (formatter, buffer, object, oclass) :
   transferToDataStructure(formatter, object, 0, buffer, None, True, oclass)
@@ -438,7 +440,9 @@ def decodeData (formatter, buffer, object, oclass) :
 # Fills in the IPC_VARCONTENT structure with the length and byteArray.
 #   "formatter" is a C pointer. Returns any error conditions.
 def marshall (formatter, object, varcontent) :
-  if (not checkMarshallStatus(formatter)) :
+  if (formatter is None):
+    return _IPC.IPC_OK
+  elif (not checkMarshallStatus(formatter)) :
     return _IPC.IPC_Error
   else :
     varcontent.length = bufferSize(formatter, object, True)
@@ -482,3 +486,29 @@ def unmarshall (formatter, byteArray, object=None, oclass=None) :
 def createFixedArray(arrayClass, formatter) :
   size = _IPC.formatFormatArrayItemInt(_IPC.formatFormatArray(formatter), 2);
   return [None] * size
+
+def formatterStr(formatter, parent=None):
+  if formatter is None: return "None"
+  type = _IPC.formatType(formatter)
+  if type == PrimitiveFMT:
+    primNames = {primFmttrs.INT_FMT: "int", primFmttrs.FLOAT_FMT: "float",
+                 primFmttrs.STR_FMT: "str",}
+    return str(primNames.get(_IPC.formatPrimitiveProc(formatter), "??"))
+  elif type == StructFMT:
+    formatArray = _IPC.formatFormatArray(formatter)
+    n = _IPC.formatFormatArrayMax(formatArray)
+    return "{" + ", ".join([formatterStr(_IPC.formatFormatArrayItemPtr(formatArray, i))
+                            for i in range(1, n)]) + "}"
+  elif type == PointerFMT:
+    return "*" + formatterStr(_IPC.formatChoosePtrFormat(formatter, parent),
+                              formatter)
+  elif type == FixedArrayFMT:
+    subformat = _IPC.formatFormatArrayItemPtr(_IPC.formatFormatArray(formatter), 1)
+    return "[" + formatterStr(subformat) + "]"
+  elif type == VarArrayFMT:
+    subformat = _IPC.formatFormatArrayItemPtr(_IPC.formatFormatArray(formatter), 1)
+    return "<" + formatterStr(subformat) + ">"
+  elif type == NamedFMT:
+    return "Named"
+  elif type == EnumFMT:
+    return "Enum"

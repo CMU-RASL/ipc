@@ -121,7 +121,7 @@ def IPC_isMsgDefined (*args) :
 
 def IPC_publish (msgName, length, content) :
   if (isinstance(content, (tuple, list))) :
-    raise "IPC_publish using list/tuples NYI"
+    Raise("IPC_publish using list/tuples NYI")
   else :
     return _IPC.IPC_publish(msgName, length, content)
 
@@ -380,7 +380,7 @@ def IPC_printData (formatter, stream, data) :
   return printData(formatter, stream.fileno(), vc)
 
 def IPC_readData (formatter, stream) :
-  raise "IPC_readData: Not yet implemented"
+  Raise("IPC_readData: Not yet implemented")
 
 def addTimer (tdelay, count, handler, clientData, timerRef) :
   global timerHashTable, handlerNumber
@@ -472,7 +472,7 @@ def msgCallbackHandler (msgInstance, byteArray, key) :
         try :(data, retval) =  formatters.unmarshall(formatter, \
                                                      byteArray, None, oclass)
         except : retval = IPC_Error
-        if (retval != IPC_OK) : raise "msgCallbackHandler: unmarshall failed"
+        if (retval != IPC_OK) : Raise("msgCallbackHandler: unmarshall failed")
         handlerData[0](msgInstance, data, handlerData[1])
         IPC_freeByteArray(byteArray)
       else :
@@ -499,7 +499,7 @@ def queryCallbackHandler (msgInstance, byteArray, key) :
         try :(data, retval) =  formatters.unmarshall(formatter, \
                                                      byteArray, None, oclass)
         except : retval = IPC_Error
-        if (retval != IPC_OK) : raise "queryCallbackHandler: unmarshall failed"
+        if (retval != IPC_OK) : Raise("queryCallbackHandler: unmarshall failed")
         handlerData[0](msgInstance, data, handlerData[1])
         IPC_freeByteArray(byteArray)
       else :
