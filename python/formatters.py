@@ -201,7 +201,7 @@ def feasibleToDecodeVarArray (size, formatArray, dStart) :
 def bufferSize1 (format, dataStruct, dStart, parentFormat, isTopLevelStruct) :
   bufSize = 0
   ftype = _IPC.formatType(format)
-  
+
   if (ftype == LengthFMT) :
     IPC.Raise("Python version of IPC can only use explicit formats")
   elif (ftype == PrimitiveFMT) :
@@ -492,7 +492,7 @@ def formatterStr(formatter, parent=None):
   type = _IPC.formatType(formatter)
   if type == PrimitiveFMT:
     primNames = {primFmttrs.INT_FMT: "int", primFmttrs.FLOAT_FMT: "float",
-                 primFmttrs.STR_FMT: "str",}
+                 primFmttrs.STR_FMT: "str", primFmttrs.CHAR_FMT: "char",}
     return str(primNames.get(_IPC.formatPrimitiveProc(formatter), "??"))
   elif type == StructFMT:
     formatArray = _IPC.formatFormatArray(formatter)
