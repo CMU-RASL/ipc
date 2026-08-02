@@ -2,8 +2,15 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext as _build_ext
 import os
 
+# Have to pip install pthreads-win32
+
 py_dir = os.path.dirname(__file__)
 src_dir = os.path.join(os.path.dirname(py_dir), "src")
+
+os.environ["DISTUTILS_USE_SDK"] = "1"
+os.environ["PLATFORM"] = "x64"
+if "VCINSTALLDIR" not in os.environ: 
+    os.environ["TARGET_CPU"] = "x64"
 
 class build_ext_local(_build_ext):
     def finalize_options(self):
@@ -49,6 +56,8 @@ ext_modules = [
         define_macros=[("PYTHON_EXTENSION", "1")],
         libraries=(['Ws2_32'] if os.name == 'nt' else []),
         language="c",
+        extra_compile_args=['-DTHREADED', '-DWINDOWS'],
+        depends=['python/ipcPython.c']
     )
 ]
 
@@ -60,15 +69,16 @@ long_description = (
 )
 
 if __name__ == "__main__":
+    import sys
     if len(sys.argv) == 1:
         sys.argv.append("build_ext")
 
 setup(
     name="ipc",
-    version="0.1",
+    version="9.2",
     description="IPC native extension for Python",
     long_description=long_description,
-    project_urls={"Homepage": "https://example.com/ipc"},
+    project_urls={"Homepage": "https://www.cmu.edu/~reids/ipc"},
     ext_modules=ext_modules,
     cmdclass = {"build_ext": build_ext_local},
 )
