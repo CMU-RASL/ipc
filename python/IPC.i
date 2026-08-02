@@ -52,6 +52,8 @@
 #include "ipcFFI.c"
 #include "ipcPython.c"
 
+PyMODINIT_FUNC PyInit__IPC(void);
+
 %}
 
 /**********************************************************************
