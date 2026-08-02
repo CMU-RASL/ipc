@@ -169,6 +169,10 @@ ifeq ($(THIS_OS),CYGWIN_NT-5.1)
 THIS_OS := wnt
 THIS_RELEASE := 5.1
 endif
+ifeq ($(findstring CYGWIN_NT-10, $(THIS_OS)), CYGWIN_NT-10)
+THIS_OS := wnt
+THIS_RELEASE := 10.0
+endif
 
 # Compiling with the VX flag signals to compile for vxworks
 ifdef VX
