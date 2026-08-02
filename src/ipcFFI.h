@@ -42,7 +42,9 @@ typedef //union {
 /*}*/ FORMAT_ARRAY_TYPE, *FORMAT_ARRAY_PTR;
 typedef struct _X_IPC_REF *X_IPC_REF_PTR;
 typedef struct _BUFFER_TYPE BUFFER_TYPE, *BUFFER_PTR;
+#ifndef SWIG
 typedef IPC_VARCONTENT_TYPE *IPC_VARCONTENT_PTR;
+#endif
 #endif
 
 #ifdef macintosh
