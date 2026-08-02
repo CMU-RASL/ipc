@@ -505,7 +505,6 @@
 #include <netdb.h>
 #include <errno.h>
 #ifndef _REENTRANT
-extern int errno;
 #endif
 #include <signal.h>
 #include <sys/time.h>
@@ -615,7 +614,6 @@ extern int unlink _PARAMS((char *));
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <errno.h>
-extern int errno;
 #include <sys/uio.h>
 #include <bsd/netinet/in.h>
 #include <bsd/netinet/tcp.h>
@@ -742,7 +740,6 @@ extern char **environment;
 #include <sys/un.h>
 #include <netdb.h>
 #include <errno.h>
-extern int errno;
 #include <fcntl.h>
 #include <sys/filio.h>
 #include <strings.h>
@@ -975,7 +972,6 @@ extern int setpgrp(int, int);
 #include <netdb.h>
 #include <errno.h>
 #ifndef _REENTRANT
-extern int errno;
 #endif /* !_REEANTRANT */
 #include <signal.h>
 #include <sys/time.h>
@@ -1024,7 +1020,6 @@ extern int gethostname(char *name, int namelen);
 #include <sys/un.h>
 #include <netdb.h>
 #include <errno.h>
-extern int errno;
 #include <signal.h>
 #include <sys/time.h>
 #include <machine/endian.h>
@@ -1106,7 +1101,6 @@ extern int	vfprintf _PARAMS((FILE *, const char *, void *));
 #include <sys/un.h>
 #include <netdb.h>
 #include <errno.h>
-extern int errno;
 #include <signal.h>
 #include <sys/time.h>
 #include <termios.h>
