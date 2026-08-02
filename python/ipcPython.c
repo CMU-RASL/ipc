@@ -37,14 +37,20 @@
 
 extern const char *ipcErrorStrings[];
 
+static PyObject *get_ipc(void) {
+  return PyImport_AddModule("IPC");
+}
+
 static void ipcPythonMsgHandler (MSG_INSTANCE msg, void *data, void *key)
 {
-  PyObject *IPC_module = PyImport_AddModule("IPC");
-  PyObject *hnd = PyObject_GetAttrString(IPC_module, "msgCallbackHandler");
+  static PyObject *hnd = NULL;
+  if (hnd == NULL) hnd = PyObject_GetAttrString(get_ipc(), "msgCallbackHandler");
   PyObject *pymsg = SWIG_NewPointerObj(msg, SWIGTYPE_p__X_IPC_REF, 0);
   PyObject *pydata = SWIG_NewPointerObj(data, SWIGTYPE_p_void, 0);
   PyObject *arglist = Py_BuildValue("(OOl)", pymsg, pydata, (long)key);
-  PyEval_CallObject(hnd, arglist);
+  PyObject *result = PyObject_CallObject(hnd, arglist);
+  Py_DECREF(arglist);
+  Py_XDECREF(result);
 }
 
 IPC_RETURN_TYPE subscribe (const char *msgName, const char *hndName, long key)
@@ -55,10 +61,12 @@ IPC_RETURN_TYPE subscribe (const char *msgName, const char *hndName, long key)
 
 static void ipcPythonFdHandler (int fd, void *key)
 {
-  PyObject *IPC_module = PyImport_AddModule("IPC");
-  PyObject *hnd = PyObject_GetAttrString(IPC_module, "fdCallbackHandler");
+  static PyObject *hnd = NULL;
+  if (hnd == NULL) hnd = PyObject_GetAttrString(get_ipc(), "fdCallbackHandler");
   PyObject *arglist = Py_BuildValue("(il)", fd, (long)key);
-  PyEval_CallObject(hnd, arglist);
+  PyObject *result = PyObject_CallObject(hnd, arglist);
+  Py_DECREF(arglist);
+  Py_XDECREF(result);
 }
 
 IPC_RETURN_TYPE subscribeFD (int fd, long key)
@@ -73,20 +81,23 @@ IPC_RETURN_TYPE unsubscribeFD (int fd)
 
 static void ipcPythonConnectHandler (const char *moduleName, void *clientData)
 {
-  PyObject *IPC_module = PyImport_AddModule("IPC");
-  PyObject *hnd = PyObject_GetAttrString(IPC_module, "connectCallbackHandler");
+  static PyObject *hnd = NULL;
+  if (hnd == NULL) hnd = PyObject_GetAttrString(get_ipc(), "connectCallbackHandler"); 
   PyObject *arglist = Py_BuildValue("(s)", moduleName);
-  PyEval_CallObject(hnd, arglist);
+  PyObject *result = PyObject_CallObject(hnd, arglist);
+  Py_DECREF(arglist);
+  Py_XDECREF(result);
 }
 
 static void ipcPythonDisconnectHandler (const char *moduleName,
                                         void *clientData)
 {
-  PyObject *IPC_module = PyImport_AddModule("IPC");
-  PyObject *hnd = PyObject_GetAttrString(IPC_module,
-                                         "disconnectCallbackHandler");
+  static PyObject *hnd = NULL;
+  if (hnd == NULL) hnd = PyObject_GetAttrString(get_ipc(), "disconnectCallbackHandler");
   PyObject *arglist = Py_BuildValue("(s)", moduleName);
-  PyEval_CallObject(hnd, arglist);
+  PyObject *result = PyObject_CallObject(hnd, arglist);
+  Py_DECREF(arglist);
+  Py_XDECREF(result);
 }
 
 IPC_RETURN_TYPE subscribeConnect (void)
@@ -112,20 +123,24 @@ IPC_RETURN_TYPE unsubscribeDisconnect (void)
 static void ipcPythonChangeHandler (const char *msgName, int numHandlers,
                                     void *clientData)
 {
-  PyObject *IPC_module = PyImport_AddModule("IPC");
-  PyObject *hnd = PyObject_GetAttrString(IPC_module, "changeCallbackHandler");
+  static PyObject *hnd = NULL;
+  if (hnd == NULL) hnd = PyObject_GetAttrString(get_ipc(), "changeCallbackHandler");
   PyObject *arglist = Py_BuildValue("(si)", msgName, numHandlers);
-  PyEval_CallObject(hnd, arglist);
+  PyObject *result = PyObject_CallObject(hnd, arglist);
+  Py_DECREF(arglist);
+  Py_XDECREF(result);
 }
 
 static void ipcPythonQueryHandler (MSG_INSTANCE msg, void *data, void *qhndKey)
 {
-  PyObject *IPC_module = PyImport_AddModule("IPC");
-  PyObject *hnd = PyObject_GetAttrString(IPC_module, "queryCallbackHandler");
+  static PyObject *hnd = NULL;
+  if (hnd == NULL) hnd = PyObject_GetAttrString(get_ipc(), "queryCallbackHandler");
   PyObject *pymsg = SWIG_NewPointerObj(msg, SWIGTYPE_p__X_IPC_REF, 0);
   PyObject *pydata = SWIG_NewPointerObj(data, SWIGTYPE_p_void, 0);
   PyObject *arglist = Py_BuildValue("(OOl)", pymsg, pydata, (long)qhndKey);
-  PyEval_CallObject(hnd, arglist);
+  PyObject *result = PyObject_CallObject(hnd, arglist);
+  Py_DECREF(arglist);
+  Py_XDECREF(result);
 }
 
 IPC_RETURN_TYPE subscribeHandlerChange (const char *msgName)
@@ -178,11 +193,13 @@ IPC_RETURN_TYPE printData (FORMATTER_PTR formatter, int fd,
 static void ipcPythonTimerHandler (void *hndIndex, unsigned long currentTime, 
 				   unsigned long scheduledTime)
 {
-  PyObject *IPC_module = PyImport_AddModule("IPC");
-  PyObject *hnd = PyObject_GetAttrString(IPC_module, "timerCallbackHandler");
+  static PyObject *hnd = NULL;
+  if (hnd == NULL) hnd = PyObject_GetAttrString(get_ipc(), "timerCallbackHandler");
   PyObject *arglist = Py_BuildValue("(lll)", (long)hndIndex, 
                                     currentTime, scheduledTime);
-  PyEval_CallObject(hnd, arglist);
+  PyObject *result = PyObject_CallObject(hnd, arglist);
+  Py_DECREF(arglist);
+  Py_XDECREF(result);
 }
 
 IPC_RETURN_TYPE addTimerGetRef(unsigned long tdelay, long count,
@@ -197,9 +214,9 @@ IPC_RETURN_TYPE addTimerGetRef(unsigned long tdelay, long count,
 static void ipcErrorProc (void)
 {
   IPC_perror("IPC error detected");
+  static PyObject *IPCError = NULL;
   // Get the specific IPCError exception defined within Python (see below)
-  PyObject *IPC_module = PyImport_AddModule("IPC");
-  PyObject *IPCError = PyObject_GetAttrString(IPC_module, "IPCError");
+  if (IPCError == NULL) IPCError = PyObject_GetAttrString(get_ipc(), "IPCError");
   PyErr_SetString(IPCError, ipcErrorStrings[IPC_errno]);
 }
 
